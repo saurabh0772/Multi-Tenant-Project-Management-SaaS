@@ -18,11 +18,15 @@ export const setAccessToken = (token: string | null) => {
 
 export const getAccessToken = (): string | null => accessToken;
 
-// Request Interceptor: Attach Bearer Access Token
+// Request Interceptor: Attach Bearer Access Token & Active Organization ID
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (accessToken && config.headers) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    const activeOrgId = localStorage.getItem("saas_active_org_id");
+    if (activeOrgId && config.headers && !config.headers["x-organization-id"]) {
+      config.headers["x-organization-id"] = activeOrgId;
     }
     return config;
   },

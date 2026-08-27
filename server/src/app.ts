@@ -60,7 +60,13 @@ export const createApp = (): Express => {
       },
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Request-ID",
+        "X-Organization-ID",
+        "x-organization-id",
+      ],
     })
   );
 
