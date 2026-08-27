@@ -47,38 +47,6 @@ const seedDatabase = async () => {
       status: "ACTIVE",
     });
 
-    const alice = await User.create({
-      name: "Alice",
-      email: "alice@test.com",
-      passwordHash,
-      emailVerified: true,
-      status: "ACTIVE",
-    });
-
-    const bob = await User.create({
-      name: "Bob",
-      email: "bob@test.com",
-      passwordHash,
-      emailVerified: true,
-      status: "ACTIVE",
-    });
-
-    const charlie = await User.create({
-      name: "Charlie",
-      email: "charlie@test.com",
-      passwordHash,
-      emailVerified: true,
-      status: "ACTIVE",
-    });
-
-    const david = await User.create({
-      name: "David",
-      email: "david@test.com",
-      passwordHash,
-      emailVerified: true,
-      status: "ACTIVE",
-    });
-
     const sarah = await User.create({
       name: "Sarah Connor",
       email: "sarah@example.com",
@@ -106,10 +74,10 @@ const seedDatabase = async () => {
     // 2. Seed Organizations
     logger.info("Seeding Organizations...");
     const acmeOrg = await Organization.create({
-      name: "Acme Corp",
-      slug: "acme-corp",
-      ownerId: alice._id,
-      settings: { timezone: "UTC", dateFormat: "YYYY-MM-DD" },
+      name: "Acme Technologies",
+      slug: "acme-technologies",
+      ownerId: alex._id,
+      settings: { timezone: "America/New_York", dateFormat: "YYYY-MM-DD" },
       status: "ACTIVE",
     });
 
@@ -124,37 +92,9 @@ const seedDatabase = async () => {
     // 3. Seed Memberships
     logger.info("Seeding Memberships...");
     await Membership.create({
-      userId: alice._id,
-      organizationId: acmeOrg._id,
-      role: "OWNER",
-      status: "ACTIVE",
-    });
-
-    await Membership.create({
-      userId: bob._id,
-      organizationId: acmeOrg._id,
-      role: "ADMIN",
-      status: "ACTIVE",
-    });
-
-    await Membership.create({
       userId: alex._id,
       organizationId: acmeOrg._id,
-      role: "ADMIN",
-      status: "ACTIVE",
-    });
-
-    await Membership.create({
-      userId: charlie._id,
-      organizationId: acmeOrg._id,
-      role: "MANAGER",
-      status: "ACTIVE",
-    });
-
-    await Membership.create({
-      userId: david._id,
-      organizationId: acmeOrg._id,
-      role: "MEMBER",
+      role: "OWNER",
       status: "ACTIVE",
     });
 

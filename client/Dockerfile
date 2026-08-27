@@ -1,6 +1,9 @@
 # Stage 1: Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
+
+# Install build tools for native C++ compilation (argon2)
+RUN apt-get update && apt-get install -y python3 make g++ --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Copy root workspace and package manifests
 COPY package*.json ./

@@ -8,7 +8,7 @@ export const commentApi = {
     params?: { page?: number; limit?: number }
   ): Promise<{ comments: Comment[]; meta: ApiResponse<unknown>["meta"] }> => {
     const res = await apiClient.get<ApiResponse<Comment[]>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}/comments`,
+      `/organizations/${orgId}/tasks/${taskId}/comments`,
       { params }
     );
     return {
@@ -23,7 +23,7 @@ export const commentApi = {
     content: string
   ): Promise<Comment> => {
     const res = await apiClient.post<ApiResponse<Comment>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}/comments`,
+      `/organizations/${orgId}/tasks/${taskId}/comments`,
       { content }
     );
     return res.data.data;
@@ -35,7 +35,7 @@ export const commentApi = {
     content: string
   ): Promise<Comment> => {
     const res = await apiClient.patch<ApiResponse<Comment>>(
-      `/api/v1/organizations/${orgId}/comments/${commentId}`,
+      `/organizations/${orgId}/comments/${commentId}`,
       { content }
     );
     return res.data.data;
@@ -43,7 +43,7 @@ export const commentApi = {
 
   deleteComment: async (orgId: string, commentId: string): Promise<void> => {
     await apiClient.delete(
-      `/api/v1/organizations/${orgId}/comments/${commentId}`
+      `/organizations/${orgId}/comments/${commentId}`
     );
   },
 };

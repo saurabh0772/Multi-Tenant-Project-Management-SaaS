@@ -7,9 +7,11 @@ import { commentRepository } from "../repositories/comment.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
 import { storageService } from "./storage.service.js";
+import { projectService } from "./project.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import { IAttachmentDocument } from "../models/attachment.model.js";
+import { OrganizationRole } from "../constants/roles.js";
 
 export class AttachmentService {
   /**
@@ -58,21 +60,25 @@ export class AttachmentService {
     parentId: string,
     parentType: "TASK" | "COMMENT",
     file: Express.Multer.File,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
     if (!file || !file.buffer) {
       throw new AppError("No file provided for upload", 400, "VALIDATION_ERROR");
     }
 
     const orgObjId = new Types.ObjectId(organizationId);
-    const parentObjId = new Types.ObjectId(parentId);
-    const actorObjId = new Types.ObjectId(actorUserId);
 
     let taskObjId: Types.ObjectId | null = null;
     let commentObjId: Types.ObjectId | null = null;
+    let projectIdStr = "";
 
     // 1. Parent relationship & tenant isolation check
     if (parentType === "TASK") {
+      if (!parentId) {
+        throw new AppError("Task ID is required for task attachments", 400, "VALIDATION_ERROR");
+      }
+      const parentObjId = new Types.ObjectId(parentId);
       const task = await taskRepository.getTaskById(parentObjId, orgObjId);
       if (!task) {
         throw new AppError(
@@ -82,7 +88,12 @@ export class AttachmentService {
         );
       }
       taskObjId = parentObjId;
+      projectIdStr = task.projectId ? task.projectId.toString() : "";
     } else {
+      if (!parentId) {
+        throw new AppError("Comment ID is required for comment attachments", 400, "VALIDATION_ERROR");
+      }
+      const parentObjId = new Types.ObjectId(parentId);
       const comment = await commentRepository.getCommentByIdInOrg(
         parentObjId,
         orgObjId
@@ -97,17 +108,40 @@ export class AttachmentService {
       commentObjId = parentObjId;
     }
 
-    // 2. Path traversal protection & server-generated storage key
+    // 2. Project accessibility check if applicable
+    if (projectIdStr && actorRole) {
+      const accessibleProjectIds = await projectService.getAccessibleProjectIds(
+        organizationId,
+        actorUserId,
+        actorRole
+      );
+      if (accessibleProjectIds !== null) {
+        const hasAccess = accessibleProjectIds.some(
+          (id) => id.toString() === projectIdStr
+        );
+        if (!hasAccess) {
+          throw new AppError(
+            "You do not have permission to attach files in this project",
+            403,
+            "FORBIDDEN"
+          );
+        }
+      }
+    }
+
+    const actorObjId = new Types.ObjectId(actorUserId);
+
+    // 3. Path traversal protection & server-generated storage key
     const safeFileName = path
       .basename(file.originalname)
       .replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueKey = `${Date.now()}_${crypto.randomBytes(8).toString("hex")}_${safeFileName}`;
     const relativeKey = path.join(organizationId, uniqueKey);
 
-    // 3. Write file bytes via storage service
+    // 4. Write file bytes via storage service
     await storageService.saveFile(relativeKey, file.buffer);
 
-    // 4. Try MongoDB transaction. If DB fails, execute compensating disk cleanup
+    // 5. Try MongoDB transaction. If DB fails, execute compensating disk cleanup
     try {
       return await runInTransaction(async (session) => {
         const options = session ? { session } : {};
@@ -185,13 +219,41 @@ export class AttachmentService {
   /**
    * Retrieves task attachments
    */
-  public async getTaskAttachments(organizationId: string, taskId: string) {
+  public async getTaskAttachments(
+    organizationId: string,
+    taskId: string,
+    actorUserId?: string,
+    actorRole?: OrganizationRole
+  ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const taskObjId = new Types.ObjectId(taskId);
 
     const task = await taskRepository.getTaskById(taskObjId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    if (actorUserId && actorRole) {
+      const projectIdStr = task.projectId ? task.projectId.toString() : "";
+      if (projectIdStr) {
+        const accessibleProjectIds = await projectService.getAccessibleProjectIds(
+          organizationId,
+          actorUserId,
+          actorRole
+        );
+        if (accessibleProjectIds !== null) {
+          const hasAccess = accessibleProjectIds.some(
+            (id) => id.toString() === projectIdStr
+          );
+          if (!hasAccess) {
+            throw new AppError(
+              "You do not have permission to view attachments in this project",
+              403,
+              "FORBIDDEN"
+            );
+          }
+        }
+      }
     }
 
     const attachments = await attachmentRepository.findTaskAttachments(
@@ -209,7 +271,9 @@ export class AttachmentService {
    */
   public async getCommentAttachments(
     organizationId: string,
-    commentId: string
+    commentId: string,
+    _actorUserId?: string,
+    _actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const commentObjId = new Types.ObjectId(commentId);
@@ -237,7 +301,9 @@ export class AttachmentService {
    */
   public async getAttachmentFile(
     organizationId: string,
-    attachmentId: string
+    attachmentId: string,
+    _actorUserId?: string,
+    _actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
 

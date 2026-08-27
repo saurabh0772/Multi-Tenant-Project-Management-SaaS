@@ -30,6 +30,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   onClose,
 }) => {
   const queryClient = useQueryClient();
+  const taskId = task.id || task._id || "";
 
   const [commentContent, setCommentContent] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
@@ -37,15 +38,16 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
 
   // Fetch comments
   const { data: commentsData } = useQuery({
-    queryKey: ["comments", orgId, task._id],
-    queryFn: () => commentApi.listComments(orgId, task._id),
+    queryKey: ["comments", orgId, taskId],
+    queryFn: () => (taskId ? commentApi.listComments(orgId, taskId) : null),
+    enabled: !!taskId,
   });
   const comments = commentsData?.comments || [];
 
-  // Fetch attachments (if task has any or we query attachments)
+  // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !taskId) return;
 
     if (file.size > 10 * 1024 * 1024) {
       alert("File size exceeds 10MB limit.");
@@ -54,7 +56,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
 
     setUploadLoading(true);
     try {
-      await attachmentApi.uploadAttachment(orgId, file, { taskId: task._id });
+      await attachmentApi.uploadAttachment(orgId, file, { taskId });
       await queryClient.invalidateQueries({ queryKey: ["attachments"] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     } catch {
@@ -66,13 +68,13 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
 
   const handleCreateComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentContent.trim()) return;
+    if (!commentContent.trim() || !taskId) return;
 
     setCommentLoading(true);
     try {
-      await commentApi.createComment(orgId, task._id, commentContent.trim());
+      await commentApi.createComment(orgId, taskId, commentContent.trim());
       setCommentContent("");
-      await queryClient.invalidateQueries({ queryKey: ["comments", orgId, task._id] });
+      await queryClient.invalidateQueries({ queryKey: ["comments", orgId, taskId] });
     } catch {
       alert("Failed to post comment.");
     } finally {
@@ -81,9 +83,10 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    if (!taskId) return;
     try {
       await commentApi.deleteComment(orgId, commentId);
-      await queryClient.invalidateQueries({ queryKey: ["comments", orgId, task._id] });
+      await queryClient.invalidateQueries({ queryKey: ["comments", orgId, taskId] });
     } catch {
       alert("Failed to delete comment.");
     }
@@ -91,11 +94,12 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
 
   const handleAssigneeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newAssigneeId = e.target.value;
+    if (!taskId) return;
     try {
       if (newAssigneeId) {
-        await taskApi.assignTask(orgId, task._id, newAssigneeId);
+        await taskApi.assignTask(orgId, taskId, newAssigneeId);
       } else {
-        await taskApi.unassignTask(orgId, task._id);
+        await taskApi.unassignTask(orgId, taskId);
       }
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     } catch {
@@ -104,7 +108,15 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const currentAssigneeId = (task.assigneeId as any)?._id || task.assigneeId || "";
+  const tAny = task as any;
+  const currentAssigneeId =
+    tAny.assignedTo?.id ||
+    tAny.assignedTo?._id ||
+    (typeof tAny.assignedTo === "string" ? tAny.assignedTo : "") ||
+    tAny.assigneeId?.id ||
+    tAny.assigneeId?._id ||
+    (typeof tAny.assigneeId === "string" ? tAny.assigneeId : "") ||
+    "";
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end font-sans">
@@ -155,10 +167,22 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                 <option value="">Unassigned</option>
                 {members.map((m) => {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const userObj = m.userId as any;
+                  const mAny = m as any;
+                  const userObj = mAny.user || (typeof mAny.userId === "object" ? mAny.userId : null);
+                  const targetUserId =
+                    userObj?.id ||
+                    userObj?._id ||
+                    (typeof mAny.userId === "string" ? mAny.userId : "") ||
+                    m._id ||
+                    m.id ||
+                    "";
+                  const name = userObj?.name || "";
+                  const email = userObj?.email || "";
+                  const displayName = name ? (email ? `${name} (${email})` : name) : email || "Member";
+
                   return (
-                    <option key={m._id} value={userObj?._id || m.userId}>
-                      {userObj?.name || "Member"}
+                    <option key={targetUserId} value={targetUserId}>
+                      {displayName}
                     </option>
                   );
                 })}
@@ -246,7 +270,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             <div className="space-y-3 max-h-60 overflow-y-auto">
               {comments.map((c) => (
                 <div
-                  key={c._id}
+                  key={c._id || c.id}
                   className="p-3 bg-slate-950/60 border border-slate-800/60 rounded-xl space-y-1"
                 >
                   <div className="flex items-center justify-between text-[10px]">
@@ -256,7 +280,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                     <div className="flex items-center gap-2 text-slate-500">
                       <span>{formatRelativeTime(c.createdAt)}</span>
                       <button
-                        onClick={() => handleDeleteComment(c._id)}
+                        onClick={() => handleDeleteComment(c._id || c.id || "")}
                         className="hover:text-rose-400 transition-all"
                         title="Delete comment"
                       >

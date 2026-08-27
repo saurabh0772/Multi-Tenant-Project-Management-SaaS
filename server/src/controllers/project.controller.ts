@@ -15,11 +15,13 @@ export class ProjectController {
     try {
       const input = createProjectSchema.parse(req.body);
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
 
       const result = await projectService.createProject(
         organizationId,
         input,
-        req.user!.id
+        req.user!.id,
+        actorRole
       );
 
       res.status(201).json({
@@ -38,6 +40,7 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
       const queryParams = projectQuerySchema.parse(req.query);
 
       const options = {
@@ -52,7 +55,9 @@ export class ProjectController {
 
       const result = await projectService.listProjects(
         organizationId,
-        options
+        options,
+        req.user!.id,
+        actorRole
       );
 
       res.status(200).json({
@@ -72,11 +77,14 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
       const { projectId } = req.params;
 
       const result = await projectService.getProjectDetails(
         organizationId,
-        projectId
+        projectId,
+        req.user!.id,
+        actorRole
       );
 
       res.status(200).json({
@@ -95,6 +103,7 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
       const { projectId } = req.params;
       const input = updateProjectSchema.parse(req.body);
 
@@ -102,7 +111,8 @@ export class ProjectController {
         organizationId,
         projectId,
         input,
-        req.user!.id
+        req.user!.id,
+        actorRole
       );
 
       res.status(200).json({
@@ -121,12 +131,14 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
       const { projectId } = req.params;
 
       const result = await projectService.archiveProject(
         organizationId,
         projectId,
-        req.user!.id
+        req.user!.id,
+        actorRole
       );
 
       res.status(200).json({
@@ -145,12 +157,14 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
       const { projectId } = req.params;
 
       const result = await projectService.restoreProject(
         organizationId,
         projectId,
-        req.user!.id
+        req.user!.id,
+        actorRole
       );
 
       res.status(200).json({
@@ -169,12 +183,14 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
+      const actorRole = req.organization!.role;
       const { projectId } = req.params;
 
       const result = await projectService.deleteProject(
         organizationId,
         projectId,
-        req.user!.id
+        req.user!.id,
+        actorRole
       );
 
       res.status(200).json({

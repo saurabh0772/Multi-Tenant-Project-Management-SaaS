@@ -70,7 +70,7 @@ export const searchApi = {
     params?: SearchFilters
   ): Promise<SearchResponse> => {
     const res = await apiClient.get<{ success: boolean; data: SearchResponse }>(
-      `/api/v1/organizations/${orgId}/search`,
+      `/organizations/${orgId}/search`,
       { params }
     );
     return res.data.data;

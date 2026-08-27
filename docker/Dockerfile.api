@@ -1,7 +1,10 @@
 # Stage 1: Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
+
+# Install build tools for native C++ compilation (argon2)
+RUN apt-get update && apt-get install -y python3 make g++ --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace package manifests
 COPY package*.json ./
@@ -19,30 +22,33 @@ COPY server ./server
 RUN npm run build --workspace=shared
 RUN npm run build --workspace=server
 
+# Remove devDependencies to keep node_modules minimal for runtime
+RUN npm prune --omit=dev
+
 # Stage 2: Production runtime stage
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
 
 # Set production environment
 ENV NODE_ENV=production
 
-# Copy workspace package manifests
+# Copy workspace package manifests and pre-built production node_modules from builder
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY server/package*.json ./server/
-
-# Install production dependencies only
-RUN npm ci --omit=dev
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built artifacts from builder stage
 COPY --from=builder /app/shared/dist ./shared/dist
 COPY --from=builder /app/server/dist ./server/dist
 
 # Create non-root runtime user for container security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
 
 EXPOSE 5000
 
 CMD ["node", "server/dist/server.js"]
+
+

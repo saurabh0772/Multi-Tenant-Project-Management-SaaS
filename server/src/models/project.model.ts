@@ -15,6 +15,7 @@ export interface IProject {
   description?: string;
   ownerId: Types.ObjectId; // User responsible for current project ownership
   createdBy: Types.ObjectId; // User who originally created the project document
+  members: Types.ObjectId[]; // List of user IDs assigned as project members
   status: ProjectStatus;
   startDate?: Date | null;
   dueDate?: Date | null;
@@ -64,6 +65,12 @@ const projectSchema = new Schema<IProjectDocument>(
       ref: "User",
       required: [true, "CreatedBy User ID is required"],
     },
+    members: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     status: {
       type: String,
       enum: ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"],
@@ -99,5 +106,6 @@ const projectSchema = new Schema<IProjectDocument>(
 projectSchema.index({ organizationId: 1, slug: 1 }, { unique: true });
 projectSchema.index({ organizationId: 1, status: 1 });
 projectSchema.index({ organizationId: 1, ownerId: 1 });
+projectSchema.index({ organizationId: 1, members: 1 });
 
 export const Project = model<IProjectDocument>("Project", projectSchema);

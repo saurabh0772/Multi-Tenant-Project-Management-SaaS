@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -85,7 +85,7 @@ apiClient.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${API_BASE_URL}/api/v1/auth/refresh`,
+          `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );

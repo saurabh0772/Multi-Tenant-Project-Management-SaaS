@@ -121,6 +121,7 @@ export class OrganizationService {
       name: org.name,
       slug: org.slug,
       logoUrl: org.logoUrl,
+      settings: org.settings,
       role: roleMap.get(org._id.toString()) || "MEMBER",
     }));
 
@@ -171,11 +172,14 @@ export class OrganizationService {
     const df = inputAny.dateFormat || input.settings?.dateFormat;
 
     if (tz !== undefined || df !== undefined || input.settings !== undefined) {
+      const settingsObj = org.settings as unknown as { toObject?: () => Record<string, string> };
+      const currentSettings = settingsObj && typeof settingsObj.toObject === "function"
+        ? settingsObj.toObject()
+        : (org.settings as unknown as Record<string, string>) || { timezone: "UTC", dateFormat: "YYYY-MM-DD" };
+
       updatePayload.settings = {
-        ...org.settings,
-        ...(input.settings || {}),
-        ...(tz !== undefined ? { timezone: tz } : {}),
-        ...(df !== undefined ? { dateFormat: df } : {}),
+        timezone: tz ?? input.settings?.timezone ?? currentSettings.timezone ?? "UTC",
+        dateFormat: df ?? input.settings?.dateFormat ?? currentSettings.dateFormat ?? "YYYY-MM-DD",
       };
     }
 

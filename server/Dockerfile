@@ -1,6 +1,9 @@
 # Stage 1: Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
+
+# Install build tools for native C++ compilation (argon2)
+RUN apt-get update && apt-get install -y python3 make g++ --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Copy root workspace and package manifests
 COPY package*.json ./
@@ -18,18 +21,21 @@ COPY server ./server
 # Build shared library and server TypeScript application
 RUN npm run build --workspace=shared && npm run build --workspace=server
 
+# Remove devDependencies to keep node_modules minimal for runtime
+RUN npm prune --omit=dev
+
 # Stage 2: Runtime stage
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Copy root package files and install production dependencies only
+# Copy root package files and pre-built production node_modules from builder
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY server/package*.json ./server/
-RUN npm ci --only=production
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy compiled artifacts from builder
 COPY --from=builder /app/shared/dist ./shared/dist
@@ -42,7 +48,7 @@ USER node
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/health || exit 1
-
 CMD ["node", "server/dist/server.js"]
+
+
+

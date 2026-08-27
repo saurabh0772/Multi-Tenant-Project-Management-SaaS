@@ -16,28 +16,19 @@ export const TransferOwnershipModal: React.FC<TransferOwnershipModalProps> = ({
   onClose,
 }) => {
   const queryClient = useQueryClient();
-  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedTargetUserId, setSelectedTargetUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Eligible members (exclude current owner)
+  // Eligible members (exclude current owner and non-active members)
   const eligibleMembers = members.filter(
     (m) => m.role !== "OWNER" && m.status === "ACTIVE"
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMemberId) {
+    if (!selectedTargetUserId) {
       setError("Please select a member to transfer ownership to.");
-      return;
-    }
-
-    const memberObj = members.find((m) => m._id === selectedMemberId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const targetUserId = (memberObj?.userId as any)?._id || memberObj?.userId;
-
-    if (!targetUserId) {
-      setError("Invalid member selected.");
       return;
     }
 
@@ -45,15 +36,19 @@ export const TransferOwnershipModal: React.FC<TransferOwnershipModalProps> = ({
     setLoading(true);
 
     try {
-      await orgApi.transferOwnership(orgId, targetUserId);
+      await orgApi.transferOwnership(orgId, selectedTargetUserId);
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
       await queryClient.invalidateQueries({ queryKey: ["members"] });
+      await queryClient.invalidateQueries({ queryKey: ["auth"] });
       onClose();
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const apiErr = err as any;
       setError(
-        apiErr.response?.data?.error?.message || "Failed to transfer ownership."
+        apiErr.response?.data?.error?.message ||
+          apiErr.response?.data?.message ||
+          apiErr.message ||
+          "Failed to transfer ownership."
       );
     } finally {
       setLoading(false);
@@ -92,20 +87,30 @@ export const TransferOwnershipModal: React.FC<TransferOwnershipModalProps> = ({
               Select New Owner
             </label>
             <select
-              value={selectedMemberId}
-              onChange={(e) => setSelectedMemberId(e.target.value)}
+              value={selectedTargetUserId}
+              onChange={(e) => setSelectedTargetUserId(e.target.value)}
               required
               className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
             >
               <option value="">Choose a member...</option>
               {eligibleMembers.map((m) => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const userObj = m.userId as any;
-                const name = userObj?.name || "Member";
-                const email = userObj?.email || "";
+                const mAny = m as any;
+                const userObj = mAny?.user || (typeof mAny?.userId === "object" ? mAny?.userId : null);
+                const targetUserId =
+                  userObj?.id ||
+                  userObj?._id ||
+                  (typeof mAny?.userId === "string" ? mAny.userId : "") ||
+                  m._id ||
+                  m.id ||
+                  "";
+                const name = userObj?.name || "";
+                const email = userObj?.email || (typeof mAny?.userId === "string" ? mAny.userId : "");
+                const displayName = name ? (email ? `${name} (${email})` : name) : email || "Member";
+
                 return (
-                  <option key={m._id} value={m._id}>
-                    {name} ({email}) - {m.role}
+                  <option key={targetUserId} value={targetUserId}>
+                    {displayName} - {m.role}
                   </option>
                 );
               })}
@@ -122,7 +127,7 @@ export const TransferOwnershipModal: React.FC<TransferOwnershipModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading || !selectedMemberId}
+              disabled={loading || !selectedTargetUserId}
               className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-xl text-xs transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {loading ? (

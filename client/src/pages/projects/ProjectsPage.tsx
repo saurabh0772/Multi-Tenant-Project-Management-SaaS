@@ -40,7 +40,7 @@ export const ProjectsPage: React.FC = () => {
   const projects = projectsData?.projects || [];
 
   const handleArchive = async (projectId: string) => {
-    if (!activeOrg) return;
+    if (!activeOrg || !projectId) return;
     try {
       await projectApi.archiveProject(activeOrg._id, projectId);
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -50,7 +50,7 @@ export const ProjectsPage: React.FC = () => {
   };
 
   const handleRestore = async (projectId: string) => {
-    if (!activeOrg) return;
+    if (!activeOrg || !projectId) return;
     try {
       await projectApi.restoreProject(activeOrg._id, projectId);
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -60,7 +60,7 @@ export const ProjectsPage: React.FC = () => {
   };
 
   const handleDelete = async (projectId: string) => {
-    if (!activeOrg || !confirm("Are you sure you want to delete this project?")) return;
+    if (!activeOrg || !projectId || !confirm("Are you sure you want to delete this project?")) return;
     try {
       await projectApi.deleteProject(activeOrg._id, projectId);
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -148,93 +148,96 @@ export const ProjectsPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((proj) => (
-            <div
-              key={proj._id}
-              className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 hover:border-slate-700/80 transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
-                      proj.status === "ACTIVE"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : proj.status === "ARCHIVED"
-                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                    }`}
-                  >
-                    {proj.status}
-                  </span>
+          {projects.map((proj) => {
+            const projId = proj.id || proj._id || "";
+            return (
+              <div
+                key={projId}
+                className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 hover:border-slate-700/80 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                        proj.status === "ACTIVE"
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          : proj.status === "ARCHIVED"
+                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                      }`}
+                    >
+                      {proj.status}
+                    </span>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    {hasPermission("PROJECT_UPDATE") && proj.status === "ACTIVE" && (
-                      <button
-                        onClick={() => handleArchive(proj._id)}
-                        className="p-1 text-slate-500 hover:text-amber-400 rounded transition-all"
-                        title="Archive Project"
-                      >
-                        <Archive className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    {/* Actions */}
+                    <div className="flex items-center gap-1">
+                      {hasPermission("PROJECT_UPDATE") && proj.status === "ACTIVE" && (
+                        <button
+                          onClick={() => handleArchive(projId)}
+                          className="p-1 text-slate-500 hover:text-amber-400 rounded transition-all"
+                          title="Archive Project"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
-                    {hasPermission("PROJECT_UPDATE") && proj.status === "ARCHIVED" && (
-                      <button
-                        onClick={() => handleRestore(proj._id)}
-                        className="p-1 text-slate-500 hover:text-emerald-400 rounded transition-all"
-                        title="Restore Project"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      {hasPermission("PROJECT_UPDATE") && proj.status === "ARCHIVED" && (
+                        <button
+                          onClick={() => handleRestore(projId)}
+                          className="p-1 text-slate-500 hover:text-emerald-400 rounded transition-all"
+                          title="Restore Project"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
-                    {hasPermission("PROJECT_DELETE") && (
-                      <button
-                        onClick={() => handleDelete(proj._id)}
-                        className="p-1 text-slate-500 hover:text-rose-400 rounded transition-all"
-                        title="Delete Project"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      {hasPermission("PROJECT_DELETE") && (
+                        <button
+                          onClick={() => handleDelete(projId)}
+                          className="p-1 text-slate-500 hover:text-rose-400 rounded transition-all"
+                          title="Delete Project"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  <Link
+                    to={`/projects/${projId}`}
+                    className="group block"
+                  >
+                    <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-all truncate">
+                      {proj.name}
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2 min-h-[2rem]">
+                      {proj.description || "No description provided."}
+                    </p>
+                  </Link>
                 </div>
 
-                <Link
-                  to={`/projects/${proj._id}`}
-                  className="group block"
-                >
-                  <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-all truncate">
-                    {proj.name}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1 line-clamp-2 min-h-[2rem]">
-                    {proj.description || "No description provided."}
-                  </p>
-                </Link>
-              </div>
-
-              <div className="pt-4 border-t border-slate-800/60 mt-4 flex items-center justify-between text-[10px] text-slate-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-slate-400" />
-                  <span>Created: {formatDate(proj.createdAt)}</span>
+                <div className="pt-4 border-t border-slate-800/60 mt-4 flex items-center justify-between text-[10px] text-slate-500">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-slate-400" />
+                    <span>Created: {formatDate(proj.createdAt)}</span>
+                  </div>
+                  <Link
+                    to={`/projects/${projId}`}
+                    className="text-blue-400 font-medium hover:underline"
+                  >
+                    Open Board &rarr;
+                  </Link>
                 </div>
-                <Link
-                  to={`/projects/${proj._id}`}
-                  className="text-blue-400 font-medium hover:underline"
-                >
-                  Open Board &rarr;
-                </Link>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Create Project Modal */}
       {isCreateModalOpen && activeOrg && (
         <CreateProjectModal
-          orgId={activeOrg._id}
+          orgId={activeOrg._id || activeOrg.id || ""}
           onClose={() => setIsCreateModalOpen(false)}
         />
       )}

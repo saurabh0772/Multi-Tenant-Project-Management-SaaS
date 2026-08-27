@@ -38,7 +38,7 @@ export const DashboardPage: React.FC = () => {
       if (!activeOrg || projects.length === 0) return [];
       // Fetch tasks from first 3 projects
       const taskPromises = projects.slice(0, 3).map((p) =>
-        taskApi.listTasks(activeOrg._id, p._id).then((res) => res.tasks)
+        taskApi.listTasks(activeOrg._id || activeOrg.id || "", p.id || p._id || "").then((res) => res.tasks)
       );
       const results = await Promise.all(taskPromises);
       return results.flat();
@@ -84,7 +84,7 @@ export const DashboardPage: React.FC = () => {
               <span>Workspace Dashboard</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Welcome back, {user?.name || "Member"}
+              Welcome back, {user?.name || "User"}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
               Here is an overview of {activeOrg?.name || "your organization"}&apos;s activity and progress.

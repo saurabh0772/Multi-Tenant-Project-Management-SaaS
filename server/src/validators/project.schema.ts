@@ -32,6 +32,9 @@ export const createProjectSchema = z
       .trim()
       .regex(objectIdRegex, "Invalid Owner User ID format")
       .optional(),
+    memberIds: z
+      .array(z.string().trim().regex(objectIdRegex, "Invalid Member User ID format"))
+      .optional(),
     status: projectStatusEnum.optional(),
     startDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).nullable().optional(),
     dueDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).nullable().optional(),
@@ -72,6 +75,9 @@ export const updateProjectSchema = z
       .string()
       .trim()
       .regex(objectIdRegex, "Invalid Owner User ID format")
+      .optional(),
+    memberIds: z
+      .array(z.string().trim().regex(objectIdRegex, "Invalid Member User ID format"))
       .optional(),
     status: projectStatusEnum.optional(),
     startDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).nullable().optional(),

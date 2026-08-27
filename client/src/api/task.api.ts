@@ -5,6 +5,7 @@ export interface ListTasksParams {
   search?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  assignedTo?: string;
   assigneeId?: string;
   page?: number;
   limit?: number;
@@ -15,6 +16,7 @@ export interface CreateTaskParams {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  assignedTo?: string;
   assigneeId?: string;
   dueDate?: string;
   labels?: string[];
@@ -25,6 +27,7 @@ export interface UpdateTaskParams {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  assignedTo?: string | null;
   assigneeId?: string | null;
   dueDate?: string | null;
   labels?: string[];
@@ -37,7 +40,7 @@ export const taskApi = {
     params?: ListTasksParams
   ): Promise<{ tasks: Task[]; meta: ApiResponse<unknown>["meta"] }> => {
     const res = await apiClient.get<ApiResponse<Task[]>>(
-      `/api/v1/organizations/${orgId}/projects/${projectId}/tasks`,
+      `/organizations/${orgId}/projects/${projectId}/tasks`,
       { params }
     );
     return {
@@ -51,16 +54,23 @@ export const taskApi = {
     projectId: string,
     params: CreateTaskParams
   ): Promise<Task> => {
+    const payload = {
+      ...params,
+      assignedTo: params.assignedTo || params.assigneeId || undefined,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (payload as any).assigneeId;
+
     const res = await apiClient.post<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/projects/${projectId}/tasks`,
-      params
+      `/organizations/${orgId}/projects/${projectId}/tasks`,
+      payload
     );
     return res.data.data;
   },
 
   getTask: async (orgId: string, taskId: string): Promise<Task> => {
     const res = await apiClient.get<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}`
+      `/organizations/${orgId}/tasks/${taskId}`
     );
     return res.data.data;
   },
@@ -70,9 +80,21 @@ export const taskApi = {
     taskId: string,
     params: UpdateTaskParams
   ): Promise<Task> => {
+    const payload = {
+      ...params,
+      assignedTo:
+        params.assignedTo !== undefined
+          ? params.assignedTo
+          : params.assigneeId !== undefined
+          ? params.assigneeId
+          : undefined,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (payload as any).assigneeId;
+
     const res = await apiClient.patch<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}`,
-      params
+      `/organizations/${orgId}/tasks/${taskId}`,
+      payload
     );
     return res.data.data;
   },
@@ -83,7 +105,7 @@ export const taskApi = {
     params: { status: TaskStatus; position: number }
   ): Promise<Task> => {
     const res = await apiClient.patch<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}/position`,
+      `/organizations/${orgId}/tasks/${taskId}/position`,
       params
     );
     return res.data.data;
@@ -92,29 +114,29 @@ export const taskApi = {
   assignTask: async (
     orgId: string,
     taskId: string,
-    assigneeId: string
+    assignedTo: string
   ): Promise<Task> => {
     const res = await apiClient.post<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}/assign`,
-      { assigneeId }
+      `/organizations/${orgId}/tasks/${taskId}/assign`,
+      { assignedTo }
     );
     return res.data.data;
   },
 
   unassignTask: async (orgId: string, taskId: string): Promise<Task> => {
     const res = await apiClient.post<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}/unassign`
+      `/organizations/${orgId}/tasks/${taskId}/unassign`
     );
     return res.data.data;
   },
 
   deleteTask: async (orgId: string, taskId: string): Promise<void> => {
-    await apiClient.delete(`/api/v1/organizations/${orgId}/tasks/${taskId}`);
+    await apiClient.delete(`/organizations/${orgId}/tasks/${taskId}`);
   },
 
   restoreTask: async (orgId: string, taskId: string): Promise<Task> => {
     const res = await apiClient.post<ApiResponse<Task>>(
-      `/api/v1/organizations/${orgId}/tasks/${taskId}/restore`
+      `/organizations/${orgId}/tasks/${taskId}/restore`
     );
     return res.data.data;
   },

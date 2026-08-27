@@ -14,7 +14,18 @@ export class LocalStorageProvider implements IStorageProvider {
   private readonly uploadsRootDir: string;
 
   constructor(uploadsDir?: string) {
-    this.uploadsRootDir = uploadsDir || path.resolve(process.cwd(), "uploads");
+    if (uploadsDir) {
+      this.uploadsRootDir = uploadsDir;
+    } else if (process.env.UPLOADS_DIR) {
+      this.uploadsRootDir = process.env.UPLOADS_DIR;
+    } else {
+      const serverUploads = path.resolve(process.cwd(), "server", "uploads");
+      if (fs.existsSync(serverUploads)) {
+        this.uploadsRootDir = serverUploads;
+      } else {
+        this.uploadsRootDir = path.resolve(process.cwd(), "uploads");
+      }
+    }
   }
 
   public getAbsoluteFilePath(relativeKey: string): string {

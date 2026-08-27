@@ -28,6 +28,7 @@ export class ProjectRepository extends BaseRepository<IProjectDocument> {
       .findOne({ _id: projectId, organizationId })
       .populate("ownerId", "name email avatarUrl status")
       .populate("createdBy", "name email")
+      .populate("members", "name email avatarUrl status")
       .exec();
   }
 
@@ -61,7 +62,8 @@ export class ProjectRepository extends BaseRepository<IProjectDocument> {
    */
   public async findOrgProjectsPaginated(
     organizationId: Types.ObjectId | string,
-    options: FindOrgProjectsOptions = {}
+    options: FindOrgProjectsOptions = {},
+    accessibleProjectIds?: Types.ObjectId[] | null
   ): Promise<{ projects: IProjectDocument[]; total: number; page: number; limit: number }> {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
@@ -69,6 +71,10 @@ export class ProjectRepository extends BaseRepository<IProjectDocument> {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filter: Record<string, any> = { organizationId };
+
+    if (accessibleProjectIds !== undefined && accessibleProjectIds !== null) {
+      filter._id = { $in: accessibleProjectIds };
+    }
 
     // Status filtering
     if (options.status) {
@@ -117,6 +123,7 @@ export class ProjectRepository extends BaseRepository<IProjectDocument> {
         .find(filter)
         .populate("ownerId", "name email avatarUrl status")
         .populate("createdBy", "name email")
+        .populate("members", "name email avatarUrl status")
         .sort(sortOptions)
         .skip(skip)
         .limit(limit)
@@ -130,6 +137,31 @@ export class ProjectRepository extends BaseRepository<IProjectDocument> {
       page,
       limit,
     };
+  }
+
+  /**
+   * Finds all project IDs where user is owner, creator, or assigned member in target organization
+   */
+  public async findUserAccessibleProjectIds(
+    userId: Types.ObjectId | string,
+    organizationId: Types.ObjectId | string
+  ): Promise<Types.ObjectId[]> {
+    const userObjId = new Types.ObjectId(userId);
+    const orgObjId = new Types.ObjectId(organizationId);
+
+    const projects = await this.model
+      .find({
+        organizationId: orgObjId,
+        $or: [
+          { ownerId: userObjId },
+          { createdBy: userObjId },
+          { members: userObjId },
+        ],
+      })
+      .select("_id")
+      .exec();
+
+    return projects.map((p) => p._id);
   }
 
   /**
@@ -148,6 +180,7 @@ export class ProjectRepository extends BaseRepository<IProjectDocument> {
       })
       .populate("ownerId", "name email avatarUrl status")
       .populate("createdBy", "name email")
+      .populate("members", "name email avatarUrl status")
       .exec();
   }
 

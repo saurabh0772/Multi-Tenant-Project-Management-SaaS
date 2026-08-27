@@ -58,7 +58,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const apiErr = err as any;
       setError(
-        apiErr.response?.data?.error?.message || "Failed to create task."
+        apiErr.response?.data?.error?.message ||
+          apiErr.response?.data?.message ||
+          apiErr.message ||
+          "Failed to create task."
       );
     } finally {
       setLoading(false);
@@ -160,10 +163,22 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 <option value="">Unassigned</option>
                 {members.map((m) => {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const userObj = m.userId as any;
+                  const mAny = m as any;
+                  const userObj = mAny.user || (typeof mAny.userId === "object" ? mAny.userId : null);
+                  const targetUserId =
+                    userObj?.id ||
+                    userObj?._id ||
+                    (typeof mAny.userId === "string" ? mAny.userId : "") ||
+                    m._id ||
+                    m.id ||
+                    "";
+                  const name = userObj?.name || "";
+                  const email = userObj?.email || "";
+                  const displayName = name ? (email ? `${name} (${email})` : name) : email || "Member";
+
                   return (
-                    <option key={m._id} value={userObj?._id || m.userId}>
-                      {userObj?.name || "Member"}
+                    <option key={targetUserId} value={targetUserId}>
+                      {displayName}
                     </option>
                   );
                 })}
@@ -178,7 +193,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 [color-scheme:dark]"
               />
             </div>
           </div>

@@ -94,23 +94,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Recent Projects
             </div>
             <div className="space-y-1">
-              {projects.map((proj) => (
-                <NavLink
-                  key={proj._id}
-                  to={`/projects/${proj._id}`}
-                  onClick={onCloseMobile}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg text-xs transition-all ${
-                      isActive
-                        ? "text-blue-400 font-medium bg-blue-500/10"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-                    }`
-                  }
-                >
-                  <Folder className="w-3.5 h-3.5 shrink-0 text-slate-500" />
-                  <span className="truncate">{proj.name}</span>
-                </NavLink>
-              ))}
+              {projects.map((proj) => {
+                const projId = proj.id || proj._id || "";
+                return (
+                  <NavLink
+                    key={projId}
+                    to={`/projects/${projId}`}
+                    onClick={onCloseMobile}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg text-xs transition-all ${
+                        isActive
+                          ? "text-blue-400 font-medium bg-blue-500/10"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                      }`
+                    }
+                  >
+                    <Folder className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                    <span className="truncate">{proj.name}</span>
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         )}

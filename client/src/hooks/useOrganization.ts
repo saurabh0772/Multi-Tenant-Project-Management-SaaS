@@ -113,14 +113,20 @@ export function useOrganization() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const itemAny = activeItem as any;
     const settings = itemAny.settings || itemAny.organization?.settings || {};
+    const tz = settings.timezone || itemAny.timezone || itemAny.organization?.timezone || "UTC";
+    const df = settings.dateFormat || itemAny.dateFormat || itemAny.organization?.dateFormat || "YYYY-MM-DD";
     return {
       _id: orgId,
       id: orgId,
       name: activeItem.name || activeItem.organization?.name || "",
       slug: activeItem.slug || activeItem.organization?.slug || "",
       logoUrl: activeItem.logoUrl ?? activeItem.organization?.logoUrl,
-      timezone: settings.timezone || "UTC",
-      dateFormat: settings.dateFormat || "YYYY-MM-DD",
+      settings: {
+        timezone: tz,
+        dateFormat: df,
+      },
+      timezone: tz,
+      dateFormat: df,
     };
   }, [activeItem]);
 

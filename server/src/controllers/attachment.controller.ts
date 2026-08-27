@@ -2,21 +2,26 @@ import { Request, Response, NextFunction } from "express";
 import { attachmentService } from "../services/attachment.service.js";
 
 export class AttachmentController {
-  public uploadTaskAttachment = async (
+  public uploadAttachment = async (
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
       const organizationId = req.organization!.id;
-      const { taskId } = req.params;
+      const taskId = req.body?.taskId || req.params?.taskId;
+      const commentId = req.body?.commentId || req.params?.commentId;
+
+      const parentId = taskId || commentId || "";
+      const parentType: "TASK" | "COMMENT" = taskId ? "TASK" : "COMMENT";
 
       const result = await attachmentService.uploadAttachment(
         organizationId,
-        taskId,
-        "TASK",
+        parentId,
+        parentType,
         req.file!,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(201).json({
@@ -26,6 +31,52 @@ export class AttachmentController {
     } catch (error) {
       next(error);
     }
+  };
+
+  public getAttachments = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const organizationId = req.organization!.id;
+      const taskId = (req.query.taskId || req.params.taskId) as string;
+      const commentId = (req.query.commentId || req.params.commentId) as string;
+
+      let result;
+      if (taskId) {
+        result = await attachmentService.getTaskAttachments(
+          organizationId,
+          taskId,
+          req.user!.id,
+          req.organization!.role
+        );
+      } else if (commentId) {
+        result = await attachmentService.getCommentAttachments(
+          organizationId,
+          commentId,
+          req.user!.id,
+          req.organization!.role
+        );
+      } else {
+        result = { attachments: [] };
+      }
+
+      res.status(200).json({
+        success: true,
+        data: result.attachments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public uploadTaskAttachment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    return this.uploadAttachment(req, res, next);
   };
 
   public uploadCommentAttachment = async (
@@ -33,25 +84,7 @@ export class AttachmentController {
     res: Response,
     next: NextFunction
   ): Promise<void> => {
-    try {
-      const organizationId = req.organization!.id;
-      const { commentId } = req.params;
-
-      const result = await attachmentService.uploadAttachment(
-        organizationId,
-        commentId,
-        "COMMENT",
-        req.file!,
-        req.user!.id
-      );
-
-      res.status(201).json({
-        success: true,
-        data: result.attachment,
-      });
-    } catch (error) {
-      next(error);
-    }
+    return this.uploadAttachment(req, res, next);
   };
 
   public getTaskAttachments = async (
@@ -59,22 +92,7 @@ export class AttachmentController {
     res: Response,
     next: NextFunction
   ): Promise<void> => {
-    try {
-      const organizationId = req.organization!.id;
-      const { taskId } = req.params;
-
-      const result = await attachmentService.getTaskAttachments(
-        organizationId,
-        taskId
-      );
-
-      res.status(200).json({
-        success: true,
-        data: result.attachments,
-      });
-    } catch (error) {
-      next(error);
-    }
+    return this.getAttachments(req, res, next);
   };
 
   public getCommentAttachments = async (
@@ -82,22 +100,7 @@ export class AttachmentController {
     res: Response,
     next: NextFunction
   ): Promise<void> => {
-    try {
-      const organizationId = req.organization!.id;
-      const { commentId } = req.params;
-
-      const result = await attachmentService.getCommentAttachments(
-        organizationId,
-        commentId
-      );
-
-      res.status(200).json({
-        success: true,
-        data: result.attachments,
-      });
-    } catch (error) {
-      next(error);
-    }
+    return this.getAttachments(req, res, next);
   };
 
   public downloadAttachment = async (
@@ -112,7 +115,9 @@ export class AttachmentController {
       const { attachment, filePath } =
         await attachmentService.getAttachmentFile(
           organizationId,
-          attachmentId
+          attachmentId,
+          req.user!.id,
+          req.organization!.role
         );
 
       res.download(filePath, attachment.fileName);

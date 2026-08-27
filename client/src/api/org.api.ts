@@ -33,6 +33,10 @@ export interface OrganizationListItem {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  settings?: {
+    timezone?: string;
+    dateFormat?: string;
+  };
   role: OrganizationRole;
   organization?: Organization;
 }
@@ -40,14 +44,14 @@ export interface OrganizationListItem {
 export const orgApi = {
   listOrganizations: async (): Promise<OrganizationListItem[]> => {
     const res = await apiClient.get<ApiResponse<OrganizationListItem[]>>(
-      "/api/v1/organizations"
+      "/organizations"
     );
     return res.data.data;
   },
 
   createOrganization: async (params: CreateOrgParams): Promise<Organization> => {
     const res = await apiClient.post<ApiResponse<Organization>>(
-      "/api/v1/organizations",
+      "/organizations",
       params
     );
     return res.data.data;
@@ -58,7 +62,7 @@ export const orgApi = {
     params: UpdateOrgParams
   ): Promise<Organization> => {
     const res = await apiClient.patch<ApiResponse<Organization>>(
-      `/api/v1/organizations/${orgId}`,
+      `/organizations/${orgId}`,
       params
     );
     return res.data.data;
@@ -66,18 +70,18 @@ export const orgApi = {
 
   transferOwnership: async (
     orgId: string,
-    newOwnerId: string
+    targetUserId: string
   ): Promise<{ message: string }> => {
     const res = await apiClient.post<ApiResponse<{ message: string }>>(
-      `/api/v1/organizations/${orgId}/transfer-ownership`,
-      { newOwnerId }
+      `/organizations/${orgId}/transfer-ownership`,
+      { targetUserId }
     );
     return res.data.data;
   },
 
   listMembers: async (orgId: string): Promise<Membership[]> => {
     const res = await apiClient.get<ApiResponse<Membership[]>>(
-      `/api/v1/organizations/${orgId}/members`
+      `/organizations/${orgId}/members`
     );
     return res.data.data;
   },
@@ -88,14 +92,14 @@ export const orgApi = {
     params: { role?: OrganizationRole; status?: MembershipStatus }
   ): Promise<Membership> => {
     const res = await apiClient.patch<ApiResponse<Membership>>(
-      `/api/v1/organizations/${orgId}/members/${memberId}`,
+      `/organizations/${orgId}/members/${memberId}`,
       params
     );
     return res.data.data;
   },
 
   removeMember: async (orgId: string, memberId: string): Promise<void> => {
-    await apiClient.delete(`/api/v1/organizations/${orgId}/members/${memberId}`);
+    await apiClient.delete(`/organizations/${orgId}/members/${memberId}`);
   },
 
   inviteMember: async (
@@ -104,20 +108,20 @@ export const orgApi = {
   ): Promise<{ message: string; invitation: Invitation; token?: string }> => {
     const res = await apiClient.post<
       ApiResponse<{ message: string; invitation: Invitation; token?: string }>
-    >(`/api/v1/organizations/${orgId}/invitations`, params);
+    >(`/organizations/${orgId}/invitations`, params);
     return res.data.data;
   },
 
   listInvitations: async (orgId: string): Promise<Invitation[]> => {
     const res = await apiClient.get<ApiResponse<Invitation[]>>(
-      `/api/v1/organizations/${orgId}/invitations`
+      `/organizations/${orgId}/invitations`
     );
     return res.data.data;
   },
 
   revokeInvitation: async (orgId: string, invitationId: string): Promise<void> => {
     await apiClient.delete(
-      `/api/v1/organizations/${orgId}/invitations/${invitationId}`
+      `/organizations/${orgId}/invitations/${invitationId}`
     );
   },
 
@@ -126,7 +130,7 @@ export const orgApi = {
   ): Promise<{ message: string; organizationId: string }> => {
     const res = await apiClient.post<
       ApiResponse<{ message: string; organizationId: string }>
-    >(`/api/v1/invitations/${token}/accept`);
+    >(`/invitations/${token}/accept`);
     return res.data.data;
   },
 
@@ -149,7 +153,7 @@ export const orgApi = {
         expiresAt: string;
         organization?: { id: string; name: string; slug: string; logoUrl?: string | null } | null;
       }>
-    >(`/api/v1/invitations/${token}`);
+    >(`/invitations/${token}`);
     return res.data.data;
   },
 };

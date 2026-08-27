@@ -73,7 +73,7 @@ export interface DashboardAnalyticsDTO {
 export const analyticsApi = {
   getOverview: async (orgId: string): Promise<OrganizationOverviewDTO> => {
     const { data } = await apiClient.get<ApiResponse<OrganizationOverviewDTO>>(
-      `/api/v1/organizations/${orgId}/analytics/overview`
+      `/organizations/${orgId}/analytics/overview`
     );
     return data.data;
   },
@@ -83,7 +83,7 @@ export const analyticsApi = {
     filters?: AnalyticsQueryFilter
   ): Promise<DashboardAnalyticsDTO> => {
     const { data } = await apiClient.get<ApiResponse<DashboardAnalyticsDTO>>(
-      `/api/v1/organizations/${orgId}/analytics/dashboard`,
+      `/organizations/${orgId}/analytics/dashboard`,
       { params: filters }
     );
     return data.data;
@@ -94,7 +94,7 @@ export const analyticsApi = {
     filters?: AnalyticsQueryFilter
   ): Promise<TaskDistributionDTO> => {
     const { data } = await apiClient.get<ApiResponse<TaskDistributionDTO>>(
-      `/api/v1/organizations/${orgId}/analytics/tasks`,
+      `/organizations/${orgId}/analytics/tasks`,
       { params: filters }
     );
     return data.data;
@@ -105,7 +105,7 @@ export const analyticsApi = {
     filters?: AnalyticsQueryFilter
   ): Promise<TaskTrendDTO> => {
     const { data } = await apiClient.get<ApiResponse<TaskTrendDTO>>(
-      `/api/v1/organizations/${orgId}/analytics/tasks/trends`,
+      `/organizations/${orgId}/analytics/tasks/trends`,
       { params: filters }
     );
     return data.data;
@@ -116,7 +116,7 @@ export const analyticsApi = {
     filters?: AnalyticsQueryFilter
   ): Promise<OverdueTasksDTO> => {
     const { data } = await apiClient.get<ApiResponse<OverdueTasksDTO>>(
-      `/api/v1/organizations/${orgId}/analytics/tasks/overdue`,
+      `/organizations/${orgId}/analytics/tasks/overdue`,
       { params: filters }
     );
     return data.data;
@@ -124,14 +124,14 @@ export const analyticsApi = {
 
   getMemberWorkload: async (orgId: string): Promise<{ members: MemberWorkloadItem[] }> => {
     const { data } = await apiClient.get<ApiResponse<{ members: MemberWorkloadItem[] }>>(
-      `/api/v1/organizations/${orgId}/analytics/members/workload`
+      `/organizations/${orgId}/analytics/members/workload`
     );
     return data.data;
   },
 
   getProjects: async (orgId: string): Promise<{ projects: ProjectHealthItem[] }> => {
     const { data } = await apiClient.get<ApiResponse<{ projects: ProjectHealthItem[] }>>(
-      `/api/v1/organizations/${orgId}/analytics/projects`
+      `/organizations/${orgId}/analytics/projects`
     );
     return data.data;
   },

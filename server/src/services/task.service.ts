@@ -1,4 +1,6 @@
 import { Types } from "mongoose";
+import { projectService } from "./project.service.js";
+import { OrganizationRole } from "../constants/roles.js";
 import {
   taskRepository,
   FindProjectTasksOptions,
@@ -79,7 +81,8 @@ export class TaskService {
     organizationId: string,
     projectId: string,
     input: CreateTaskInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const projObjId = new Types.ObjectId(projectId);
@@ -97,6 +100,27 @@ export class TaskService {
         404,
         "RESOURCE_NOT_FOUND"
       );
+    }
+
+    if (actorRole) {
+      const accessibleProjectIds = await projectService.getAccessibleProjectIds(
+        organizationId,
+        actorUserId,
+        actorRole
+      );
+
+      if (accessibleProjectIds !== null) {
+        const hasAccess = accessibleProjectIds.some(
+          (id) => id.toString() === project._id.toString()
+        );
+        if (!hasAccess) {
+          throw new AppError(
+            "You do not have permission to create tasks in this project",
+            403,
+            "FORBIDDEN"
+          );
+        }
+      }
     }
 
     // 2. Verify assignee active membership if supplied
@@ -209,7 +233,9 @@ export class TaskService {
   public async listProjectTasks(
     organizationId: string,
     projectId: string,
-    options: FindProjectTasksOptions
+    options: FindProjectTasksOptions,
+    actorUserId?: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const projObjId = new Types.ObjectId(projectId);
@@ -226,6 +252,27 @@ export class TaskService {
         404,
         "RESOURCE_NOT_FOUND"
       );
+    }
+
+    if (actorUserId && actorRole) {
+      const accessibleProjectIds = await projectService.getAccessibleProjectIds(
+        organizationId,
+        actorUserId,
+        actorRole
+      );
+
+      if (accessibleProjectIds !== null) {
+        const hasAccess = accessibleProjectIds.some(
+          (id) => id.toString() === project._id.toString()
+        );
+        if (!hasAccess) {
+          throw new AppError(
+            "You do not have permission to view tasks in this project",
+            403,
+            "FORBIDDEN"
+          );
+        }
+      }
     }
 
     const { tasks, total, page, limit } =

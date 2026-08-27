@@ -14,7 +14,7 @@ export const activityApi = {
     params?: ListActivitiesParams
   ): Promise<{ activities: Activity[]; meta: ApiResponse<unknown>["meta"] }> => {
     const res = await apiClient.get<ApiResponse<Activity[]>>(
-      `/api/v1/organizations/${orgId}/activities`,
+      `/organizations/${orgId}/activities`,
       { params }
     );
     return {

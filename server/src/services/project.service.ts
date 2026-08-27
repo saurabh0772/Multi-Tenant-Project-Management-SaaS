@@ -3,6 +3,7 @@ import {
   projectRepository,
   FindOrgProjectsOptions,
 } from "../repositories/project.repository.js";
+import { taskRepository } from "../repositories/task.repository.js";
 import { membershipRepository } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
@@ -14,6 +15,7 @@ import {
   UpdateProjectInput,
 } from "../validators/project.schema.js";
 import { IProjectDocument } from "../models/project.model.js";
+import { OrganizationRole } from "../constants/roles.js";
 
 export class ProjectService {
   /**
@@ -24,6 +26,18 @@ export class ProjectService {
     const owner = project.ownerId as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const creator = project.createdBy as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const membersArr = Array.isArray(project.members) ? (project.members as any[]) : [];
+    const formattedMembers = membersArr.map((m) =>
+      typeof m === "object" && m !== null
+        ? {
+            id: m._id ? m._id.toString() : m.id,
+            name: m.name || "",
+            email: m.email || "",
+            avatarUrl: m.avatarUrl || null,
+          }
+        : { id: m.toString(), name: "Member", email: "" }
+    );
 
     return {
       id: project._id.toString(),
@@ -47,6 +61,8 @@ export class ProjectService {
             email: creator.email,
           }
         : project.createdBy.toString(),
+      members: formattedMembers,
+      memberIds: formattedMembers.map((m) => m.id),
       status: project.status,
       startDate: project.startDate || null,
       dueDate: project.dueDate || null,
@@ -57,13 +73,49 @@ export class ProjectService {
   }
 
   /**
-   * Creates a new project in the target organization with active owner validation.
+   * Helper to get user's accessible project IDs for non-admin/owner roles
+   */
+  public async getAccessibleProjectIds(
+    organizationId: string,
+    userId: string,
+    role: OrganizationRole
+  ): Promise<Types.ObjectId[] | null> {
+    if (role === "OWNER" || role === "ADMIN") {
+      return null; // Full organization access
+    }
+
+    const orgObjId = new Types.ObjectId(organizationId);
+    const userObjId = new Types.ObjectId(userId);
+
+    const [projectMemberIds, taskProjectIds] = await Promise.all([
+      projectRepository.findUserAccessibleProjectIds(userObjId, orgObjId),
+      taskRepository.findProjectIdsForUser(userObjId, orgObjId),
+    ]);
+
+    const allIds = new Set<string>();
+    projectMemberIds.forEach((id) => allIds.add(id.toString()));
+    taskProjectIds.forEach((id) => allIds.add(id.toString()));
+
+    return Array.from(allIds).map((idStr) => new Types.ObjectId(idStr));
+  }
+
+  /**
+   * Creates a new project in the target organization with multiple members validation.
    */
   public async createProject(
     organizationId: string,
     input: CreateProjectInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole: OrganizationRole
   ) {
+    if (actorRole === "MEMBER") {
+      throw new AppError(
+        "Members are not permitted to create projects",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
     const targetOwnerId = input.ownerId || actorUserId;
@@ -84,7 +136,30 @@ export class ProjectService {
       );
     }
 
-    // 2. Generate slug if omitted
+    // 2. Build unique project members list (owner + creator + input.memberIds)
+    const membersSet = new Set<string>();
+    membersSet.add(ownerObjId.toString());
+    membersSet.add(actorObjId.toString());
+
+    if (input.memberIds && Array.isArray(input.memberIds)) {
+      for (const mId of input.memberIds) {
+        if (mId) {
+          const activeMem = await membershipRepository.findActiveMembership(
+            mId,
+            orgObjId
+          );
+          if (activeMem) {
+            membersSet.add(mId);
+          }
+        }
+      }
+    }
+
+    const memberObjectIds = Array.from(membersSet).map(
+      (idStr) => new Types.ObjectId(idStr)
+    );
+
+    // 3. Generate slug if omitted
     const slug =
       input.slug ||
       input.name
@@ -93,7 +168,7 @@ export class ProjectService {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
 
-    // 3. Tenant-scoped slug uniqueness check
+    // 4. Tenant-scoped slug uniqueness check
     const existingProject = await projectRepository.findBySlug(
       slug,
       orgObjId
@@ -107,7 +182,7 @@ export class ProjectService {
       );
     }
 
-    // 4. Atomic project creation and activity logging
+    // 5. Atomic project creation and activity logging
     return await runInTransaction(async (session) => {
       const options = session ? { session } : {};
 
@@ -120,6 +195,7 @@ export class ProjectService {
             description: input.description || "",
             ownerId: ownerObjId,
             createdBy: actorObjId,
+            members: memberObjectIds,
             status: input.status || "PLANNING",
             startDate: input.startDate ? new Date(input.startDate) : null,
             dueDate: input.dueDate ? new Date(input.dueDate) : null,
@@ -142,6 +218,7 @@ export class ProjectService {
               name: createdProject.name,
               slug: createdProject.slug,
               ownerId: targetOwnerId,
+              memberCount: memberObjectIds.length,
             },
           },
         ],
@@ -172,16 +249,25 @@ export class ProjectService {
   }
 
   /**
-   * Lists, filters, searches, and paginates organization projects.
+   * Lists, filters, searches, and paginates organization projects based on role & project visibility.
    */
   public async listProjects(
     organizationId: string,
-    options: FindOrgProjectsOptions
+    options: FindOrgProjectsOptions,
+    actorUserId: string,
+    actorRole: OrganizationRole
   ) {
+    const accessibleProjectIds = await this.getAccessibleProjectIds(
+      organizationId,
+      actorUserId,
+      actorRole
+    );
+
     const { projects, total, page, limit } =
       await projectRepository.findOrgProjectsPaginated(
         organizationId,
-        options
+        options,
+        accessibleProjectIds
       );
 
     const formattedProjects = projects.map((p) => this.formatProjectResponse(p));
@@ -198,9 +284,14 @@ export class ProjectService {
   }
 
   /**
-   * Tenant-scoped lookup for specific project details.
+   * Tenant-scoped lookup for specific project details with authorization checks.
    */
-  public async getProjectDetails(organizationId: string, projectId: string) {
+  public async getProjectDetails(
+    organizationId: string,
+    projectId: string,
+    actorUserId: string,
+    actorRole: OrganizationRole
+  ) {
     const project = await projectRepository.getProjectById(
       projectId,
       organizationId
@@ -210,20 +301,48 @@ export class ProjectService {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
     }
 
+    const accessibleProjectIds = await this.getAccessibleProjectIds(
+      organizationId,
+      actorUserId,
+      actorRole
+    );
+
+    if (accessibleProjectIds !== null) {
+      const hasAccess = accessibleProjectIds.some(
+        (id) => id.toString() === project._id.toString()
+      );
+      if (!hasAccess) {
+        throw new AppError(
+          "You do not have permission to view this project",
+          403,
+          "FORBIDDEN"
+        );
+      }
+    }
+
     return {
       project: this.formatProjectResponse(project),
     };
   }
 
   /**
-   * Updates project details with tenant scoping and owner membership validation.
+   * Updates project details with role, project-level authorization, and project members management.
    */
   public async updateProject(
     organizationId: string,
     projectId: string,
     input: UpdateProjectInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole: OrganizationRole
   ) {
+    if (actorRole === "MEMBER") {
+      throw new AppError(
+        "Members are not permitted to update projects",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
@@ -234,6 +353,25 @@ export class ProjectService {
 
     if (!project) {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const accessibleProjectIds = await this.getAccessibleProjectIds(
+      organizationId,
+      actorUserId,
+      actorRole
+    );
+
+    if (accessibleProjectIds !== null) {
+      const hasAccess = accessibleProjectIds.some(
+        (id) => id.toString() === project._id.toString()
+      );
+      if (!hasAccess) {
+        throw new AppError(
+          "You do not have permission to update this project",
+          403,
+          "FORBIDDEN"
+        );
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -249,6 +387,7 @@ export class ProjectService {
     }
 
     // Owner validation if ownerId is changed
+    let targetOwnerId = project.ownerId.toString();
     if (input.ownerId !== undefined && input.ownerId !== project.ownerId.toString()) {
       const activeOwner = await membershipRepository.findActiveMembership(
         input.ownerId,
@@ -262,7 +401,31 @@ export class ProjectService {
           "VALIDATION_ERROR"
         );
       }
+      targetOwnerId = input.ownerId;
       updatePayload.ownerId = new Types.ObjectId(input.ownerId);
+    }
+
+    // Project members update if memberIds is provided
+    if (input.memberIds !== undefined && Array.isArray(input.memberIds)) {
+      const membersSet = new Set<string>();
+      membersSet.add(targetOwnerId);
+      membersSet.add(project.createdBy.toString());
+
+      for (const mId of input.memberIds) {
+        if (mId) {
+          const activeMem = await membershipRepository.findActiveMembership(
+            mId,
+            orgObjId
+          );
+          if (activeMem) {
+            membersSet.add(mId);
+          }
+        }
+      }
+
+      updatePayload.members = Array.from(membersSet).map(
+        (idStr) => new Types.ObjectId(idStr)
+      );
     }
 
     // Slug validation if slug is changed
@@ -337,19 +500,47 @@ export class ProjectService {
   }
 
   /**
-   * Archives a project (status = ARCHIVED, archivedAt = now).
+   * Archives a project (MANAGER, ADMIN, OWNER).
    */
   public async archiveProject(
     organizationId: string,
     projectId: string,
-    actorUserId: string
+    actorUserId: string,
+    actorRole: OrganizationRole
   ) {
+    if (actorRole === "MEMBER") {
+      throw new AppError(
+        "Members are not permitted to archive projects",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
     const project = await projectRepository.getProjectById(projectId, orgObjId);
     if (!project) {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const accessibleProjectIds = await this.getAccessibleProjectIds(
+      organizationId,
+      actorUserId,
+      actorRole
+    );
+
+    if (accessibleProjectIds !== null) {
+      const hasAccess = accessibleProjectIds.some(
+        (id) => id.toString() === project._id.toString()
+      );
+      if (!hasAccess) {
+        throw new AppError(
+          "You do not have permission to archive this project",
+          403,
+          "FORBIDDEN"
+        );
+      }
     }
 
     if (project.status === "ARCHIVED") {
@@ -395,13 +586,22 @@ export class ProjectService {
   }
 
   /**
-   * Restores an archived project (status = ACTIVE, archivedAt = null).
+   * Restores an archived project (OWNER and ADMIN only).
    */
   public async restoreProject(
     organizationId: string,
     projectId: string,
-    actorUserId: string
+    actorUserId: string,
+    actorRole: OrganizationRole
   ) {
+    if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
+      throw new AppError(
+        "Only organization owners and administrators can restore archived projects",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
@@ -458,8 +658,17 @@ export class ProjectService {
   public async deleteProject(
     organizationId: string,
     projectId: string,
-    actorUserId: string
+    actorUserId: string,
+    actorRole: OrganizationRole
   ) {
+    if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
+      throw new AppError(
+        "Only organization owners and administrators can delete projects",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
     const projObjId = new Types.ObjectId(projectId);

@@ -20,7 +20,7 @@ export interface AuthResponseData {
 export const authApi = {
   login: async (params: LoginParams): Promise<AuthResponseData> => {
     const res = await apiClient.post<ApiResponse<AuthResponseData>>(
-      "/api/v1/auth/login",
+      "/auth/login",
       params
     );
     if (res.data.data.accessToken) {
@@ -35,7 +35,7 @@ export const authApi = {
 
   register: async (params: RegisterParams): Promise<AuthResponseData> => {
     const res = await apiClient.post<ApiResponse<AuthResponseData>>(
-      "/api/v1/auth/register",
+      "/auth/register",
       params
     );
     if (res.data.data.accessToken) {
@@ -50,15 +50,16 @@ export const authApi = {
 
   logout: async (): Promise<void> => {
     try {
-      await apiClient.post("/api/v1/auth/logout");
+      await apiClient.post("/auth/logout");
     } finally {
       setAccessToken(null);
     }
   },
 
   getMe: async (): Promise<User> => {
-    const res = await apiClient.get<ApiResponse<User>>("/api/v1/auth/me");
-    const user = res.data.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await apiClient.get<ApiResponse<any>>("/auth/me");
+    const user = res.data.data?.user || res.data.data;
     if (user && !user._id && user.id) {
       user._id = user.id;
     }
@@ -67,7 +68,7 @@ export const authApi = {
 
   refresh: async (): Promise<string> => {
     const res = await apiClient.post<ApiResponse<{ accessToken: string }>>(
-      "/api/v1/auth/refresh"
+      "/auth/refresh"
     );
     setAccessToken(res.data.data.accessToken);
     return res.data.data.accessToken;

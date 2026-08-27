@@ -37,8 +37,6 @@ export const createApp = (): Express => {
   );
 
   // Robust CORS configuration supporting credentials mode (prohibits wildcard '*')
-  const allowedOrigins = env.CLIENT_URL.split(",").map((o) => o.trim());
-
   const corsMiddleware = cors({
     origin: (requestOrigin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, server-to-server)
@@ -46,16 +44,19 @@ export const createApp = (): Express => {
         return callback(null, true);
       }
 
-      // If wildcard '*' is specified or development mode, reflect requesting origin so credentials work
-      if (allowedOrigins.includes("*") || env.NODE_ENV === "development") {
-        return callback(null, requestOrigin);
+      const allowedOrigins = env.CLIENT_URL.split(",").map((o) => o.trim());
+
+      const isAllowed =
+        allowedOrigins.includes("*") ||
+        allowedOrigins.includes(requestOrigin) ||
+        env.NODE_ENV === "development" ||
+        /^https?:\/\/(localhost|127\.0\.0\.1):(5173|8080|3000|4173)$/.test(requestOrigin);
+
+      if (isAllowed) {
+        return callback(null, true);
       }
 
-      if (allowedOrigins.includes(requestOrigin)) {
-        return callback(null, requestOrigin);
-      }
-
-      return callback(null, requestOrigin);
+      return callback(null, true);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -68,11 +69,13 @@ export const createApp = (): Express => {
       "x-organization-id",
       "X-Organization-Id",
       "x-organization-ID",
+      "Accept",
     ],
   });
 
   app.use(corsMiddleware);
   app.options("*", corsMiddleware);
+  app.options("(.*)", corsMiddleware);
 
   // Request logging
   app.use(

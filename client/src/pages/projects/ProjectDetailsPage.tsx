@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Calendar,
   GripVertical,
+  Users,
 } from "lucide-react";
 import { formatDate } from "../../lib/utils.js";
 
@@ -37,23 +38,25 @@ export const ProjectDetailsPage: React.FC = () => {
 
   // Subscribe to Project Socket Room
   useEffect(() => {
-    if (activeOrg && projectId) {
+    if (activeOrg && projectId && projectId !== "undefined") {
       socketClientManager.joinProject(activeOrg._id, projectId);
     }
   }, [activeOrg, projectId]);
 
   // Fetch Project Details
-  const { data: project } = useQuery({
+  const { data: project, error: projectError } = useQuery({
     queryKey: ["project", activeOrg?._id, projectId],
-    queryFn: () => (activeOrg && projectId ? projectApi.getProject(activeOrg._id, projectId) : null),
-    enabled: !!activeOrg && !!projectId,
+    queryFn: () => (activeOrg && projectId && projectId !== "undefined" ? projectApi.getProject(activeOrg._id, projectId) : null),
+    enabled: !!activeOrg && !!projectId && projectId !== "undefined",
+    retry: false,
   });
 
   // Fetch Tasks
   const { data: tasksData } = useQuery({
     queryKey: ["tasks", activeOrg?._id, projectId],
-    queryFn: () => (activeOrg && projectId ? taskApi.listTasks(activeOrg._id, projectId) : null),
-    enabled: !!activeOrg && !!projectId,
+    queryFn: () => (activeOrg && projectId && projectId !== "undefined" ? taskApi.listTasks(activeOrg._id, projectId) : null),
+    enabled: !!activeOrg && !!projectId && projectId !== "undefined",
+    retry: false,
   });
   const tasks = tasksData?.tasks || [];
 
@@ -63,6 +66,38 @@ export const ProjectDetailsPage: React.FC = () => {
     queryFn: () => (activeOrg ? orgApi.listMembers(activeOrg._id) : []),
     enabled: !!activeOrg,
   });
+
+  if (!projectId || projectId === "undefined") {
+    return (
+      <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-3xl backdrop-blur-xl max-w-md mx-auto mt-12 font-sans">
+        <h3 className="text-sm font-bold text-white mb-1">Invalid Project</h3>
+        <p className="text-xs text-slate-400 mb-4">No valid project ID was specified.</p>
+        <button
+          onClick={() => navigate("/projects")}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs"
+        >
+          Back to Projects
+        </button>
+      </div>
+    );
+  }
+
+  if (projectError) {
+    return (
+      <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-3xl backdrop-blur-xl max-w-md mx-auto mt-12 font-sans">
+        <h3 className="text-sm font-bold text-white mb-1">Access Restricted</h3>
+        <p className="text-xs text-slate-400 mb-4">
+          You do not have permission to view or access this project.
+        </p>
+        <button
+          onClick={() => navigate("/projects")}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs"
+        >
+          Back to Projects
+        </button>
+      </div>
+    );
+  }
 
   // Handle Task Move (Position & Status update)
   const handleMoveTask = async (taskId: string, targetStatus: TaskStatus, position: number) => {
@@ -139,6 +174,25 @@ export const ProjectDetailsPage: React.FC = () => {
             <p className="text-xs text-slate-400 mt-1">
               {project.description || "No project description."}
             </p>
+
+            {/* Project Members Display */}
+            {project.members && project.members.length > 0 && (
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Members:</span>
+                </span>
+                {project.members.map((m) => (
+                  <span
+                    key={m.id}
+                    className="px-2.5 py-0.5 bg-slate-900 border border-slate-800 rounded-lg text-[10px] text-slate-200 font-medium"
+                    title={m.email}
+                  >
+                    {m.name || m.email || "Member"}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {hasPermission("TASK_CREATE") && (
@@ -196,47 +250,50 @@ export const ProjectDetailsPage: React.FC = () => {
 
               {/* Tasks List */}
               <div className="space-y-3 flex-1">
-                {colTasks.map((t) => (
-                  <div
-                    key={t._id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, t._id)}
-                    onClick={() => setSelectedTask(t)}
-                    className="p-4 bg-slate-900 border border-slate-800/80 hover:border-blue-500/50 rounded-2xl cursor-pointer transition-all shadow-md group relative"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="text-xs font-bold text-white group-hover:text-blue-400 transition-all line-clamp-2">
-                        {t.title}
-                      </h4>
-                      <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 shrink-0 mt-0.5" />
-                    </div>
+                {colTasks.map((t) => {
+                  const taskId = t.id || t._id || "";
+                  return (
+                    <div
+                      key={taskId}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, taskId)}
+                      onClick={() => setSelectedTask(t)}
+                      className="p-4 bg-slate-900 border border-slate-800/80 hover:border-blue-500/50 rounded-2xl cursor-pointer transition-all shadow-md group relative"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h4 className="text-xs font-bold text-white group-hover:text-blue-400 transition-all line-clamp-2">
+                          {t.title}
+                        </h4>
+                        <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 shrink-0 mt-0.5" />
+                      </div>
 
-                    {t.description && (
-                      <p className="text-[11px] text-slate-400 line-clamp-2 mb-3">
-                        {t.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-800/60">
-                      <span
-                        className={`px-1.5 py-0.5 rounded font-mono ${
-                          t.priority === "URGENT" || t.priority === "HIGH"
-                            ? "bg-rose-500/10 text-rose-400"
-                            : "bg-slate-800 text-slate-300"
-                        }`}
-                      >
-                        {t.priority}
-                      </span>
-
-                      {t.dueDate && (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-400" />
-                          <span>{formatDate(t.dueDate)}</span>
-                        </div>
+                      {t.description && (
+                        <p className="text-[11px] text-slate-400 line-clamp-2 mb-3">
+                          {t.description}
+                        </p>
                       )}
+
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-800/60">
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-mono ${
+                            t.priority === "URGENT" || t.priority === "HIGH"
+                              ? "bg-rose-500/10 text-rose-400"
+                              : "bg-slate-800 text-slate-300"
+                          }`}
+                        >
+                          {t.priority}
+                        </span>
+
+                        {t.dueDate && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            <span>{formatDate(t.dueDate)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -246,8 +303,8 @@ export const ProjectDetailsPage: React.FC = () => {
       {/* Create Task Modal */}
       {isCreateTaskOpen && activeOrg && (
         <CreateTaskModal
-          orgId={activeOrg._id}
-          projectId={project._id}
+          orgId={activeOrg._id || activeOrg.id || ""}
+          projectId={project.id || project._id || ""}
           members={members}
           defaultStatus={createTaskDefaultStatus}
           onClose={() => setIsCreateTaskOpen(false)}
@@ -257,7 +314,7 @@ export const ProjectDetailsPage: React.FC = () => {
       {/* Task Details Drawer */}
       {selectedTask && activeOrg && (
         <TaskDetailsDrawer
-          orgId={activeOrg._id}
+          orgId={activeOrg._id || activeOrg.id || ""}
           task={selectedTask}
           members={members}
           onClose={() => setSelectedTask(null)}

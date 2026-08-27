@@ -113,11 +113,14 @@ export const AnalyticsPage: React.FC = () => {
               className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
             >
               <option value="">All Projects</option>
-              {projects.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name}
-                </option>
-              ))}
+              {projects.map((p) => {
+                const pId = p.id || p._id || "";
+                return (
+                  <option key={pId} value={pId}>
+                    {p.name}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>

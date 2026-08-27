@@ -297,6 +297,23 @@ export class TaskRepository extends BaseRepository<ITaskDocument> {
       .populate("projectId", "name slug")
       .exec();
   }
+  /**
+   * Finds distinct project IDs where user is assigned or creator of a task in target organization
+   */
+  public async findProjectIdsForUser(
+    userId: Types.ObjectId | string,
+    organizationId: Types.ObjectId | string
+  ): Promise<Types.ObjectId[]> {
+    const userObjId = new Types.ObjectId(userId);
+    const orgObjId = new Types.ObjectId(organizationId);
+
+    const projectIds = await this.model.distinct("projectId", {
+      organizationId: orgObjId,
+      $or: [{ assignedTo: userObjId }, { createdBy: userObjId }],
+    });
+
+    return projectIds as Types.ObjectId[];
+  }
 }
 
 export const taskRepository = new TaskRepository();

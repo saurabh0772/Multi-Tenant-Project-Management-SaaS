@@ -10,6 +10,11 @@ export interface User {
 export type OrganizationRole = "OWNER" | "ADMIN" | "MANAGER" | "MEMBER";
 export type MembershipStatus = "ACTIVE" | "SUSPENDED";
 
+export interface OrganizationSettings {
+  timezone?: string;
+  dateFormat?: string;
+}
+
 export interface Organization {
   _id: string;
   id?: string;
@@ -17,6 +22,7 @@ export interface Organization {
   slug: string;
   ownerId?: string;
   logoUrl?: string | null;
+  settings?: OrganizationSettings;
   timezone?: string;
   dateFormat?: string;
   createdAt?: string;
@@ -42,7 +48,8 @@ export interface Membership {
 export type ProjectStatus = "ACTIVE" | "ARCHIVED" | "COMPLETED";
 
 export interface Project {
-  _id: string;
+  _id?: string;
+  id?: string;
   organizationId: string;
   name: string;
   slug: string;
@@ -52,6 +59,8 @@ export interface Project {
   dueDate?: string | null;
   ownerId: string;
   createdBy: string;
+  memberIds?: string[];
+  members?: Array<{ id: string; name: string; email: string; avatarUrl?: string | null }>;
   createdAt: string;
   updatedAt?: string;
 }
@@ -60,7 +69,8 @@ export type TaskStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export interface Task {
-  _id: string;
+  _id?: string;
+  id?: string;
   organizationId: string;
   projectId: string;
   title: string;
@@ -78,7 +88,8 @@ export interface Task {
 }
 
 export interface Comment {
-  _id: string;
+  _id?: string;
+  id?: string;
   organizationId: string;
   taskId: string;
   authorId: string;

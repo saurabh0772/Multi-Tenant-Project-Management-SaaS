@@ -25,10 +25,12 @@ export const OrganizationSettingsPage: React.FC = () => {
       setLogoUrl(activeOrg.logoUrl || "");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const activeOrgAny = activeOrg as any;
-      setTimezone(activeOrg.timezone || activeOrgAny.settings?.timezone || "UTC");
-      setDateFormat(activeOrg.dateFormat || activeOrgAny.settings?.dateFormat || "YYYY-MM-DD");
+      const tz = activeOrg.timezone || activeOrg.settings?.timezone || activeOrgAny.settings?.timezone || "UTC";
+      const df = activeOrg.dateFormat || activeOrg.settings?.dateFormat || activeOrgAny.settings?.dateFormat || "YYYY-MM-DD";
+      setTimezone(tz);
+      setDateFormat(df);
     }
-  }, [activeOrg?._id]);
+  }, [activeOrg]);
 
   const { data: members = [] } = useQuery({
     queryKey: ["members", activeOrg?._id],
@@ -218,7 +220,7 @@ export const OrganizationSettingsPage: React.FC = () => {
       {/* Ownership Transfer Modal */}
       {isTransferModalOpen && (
         <TransferOwnershipModal
-          orgId={activeOrg._id}
+          orgId={activeOrg._id || activeOrg.id || ""}
           members={members}
           onClose={() => setIsTransferModalOpen(false)}
         />

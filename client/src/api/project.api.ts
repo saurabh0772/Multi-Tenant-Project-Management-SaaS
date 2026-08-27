@@ -10,8 +10,10 @@ export interface ListProjectsParams {
 
 export interface CreateProjectParams {
   name: string;
-  slug: string;
+  slug?: string;
   description?: string;
+  ownerId?: string;
+  memberIds?: string[];
   status?: ProjectStatus;
   startDate?: string;
   dueDate?: string;
@@ -19,7 +21,10 @@ export interface CreateProjectParams {
 
 export interface UpdateProjectParams {
   name?: string;
+  slug?: string;
   description?: string;
+  ownerId?: string;
+  memberIds?: string[];
   status?: ProjectStatus;
   startDate?: string;
   dueDate?: string;
@@ -31,7 +36,7 @@ export const projectApi = {
     params?: ListProjectsParams
   ): Promise<{ projects: Project[]; meta: ApiResponse<unknown>["meta"] }> => {
     const res = await apiClient.get<ApiResponse<Project[]>>(
-      `/api/v1/organizations/${orgId}/projects`,
+      `/organizations/${orgId}/projects`,
       { params }
     );
     return {
@@ -45,7 +50,7 @@ export const projectApi = {
     params: CreateProjectParams
   ): Promise<Project> => {
     const res = await apiClient.post<ApiResponse<Project>>(
-      `/api/v1/organizations/${orgId}/projects`,
+      `/organizations/${orgId}/projects`,
       params
     );
     return res.data.data;
@@ -53,7 +58,7 @@ export const projectApi = {
 
   getProject: async (orgId: string, projectId: string): Promise<Project> => {
     const res = await apiClient.get<ApiResponse<Project>>(
-      `/api/v1/organizations/${orgId}/projects/${projectId}`
+      `/organizations/${orgId}/projects/${projectId}`
     );
     return res.data.data;
   },
@@ -64,7 +69,7 @@ export const projectApi = {
     params: UpdateProjectParams
   ): Promise<Project> => {
     const res = await apiClient.patch<ApiResponse<Project>>(
-      `/api/v1/organizations/${orgId}/projects/${projectId}`,
+      `/organizations/${orgId}/projects/${projectId}`,
       params
     );
     return res.data.data;
@@ -72,21 +77,21 @@ export const projectApi = {
 
   archiveProject: async (orgId: string, projectId: string): Promise<Project> => {
     const res = await apiClient.post<ApiResponse<Project>>(
-      `/api/v1/organizations/${orgId}/projects/${projectId}/archive`
+      `/organizations/${orgId}/projects/${projectId}/archive`
     );
     return res.data.data;
   },
 
   restoreProject: async (orgId: string, projectId: string): Promise<Project> => {
     const res = await apiClient.post<ApiResponse<Project>>(
-      `/api/v1/organizations/${orgId}/projects/${projectId}/restore`
+      `/organizations/${orgId}/projects/${projectId}/restore`
     );
     return res.data.data;
   },
 
   deleteProject: async (orgId: string, projectId: string): Promise<void> => {
     await apiClient.delete(
-      `/api/v1/organizations/${orgId}/projects/${projectId}`
+      `/organizations/${orgId}/projects/${projectId}`
     );
   },
 };

@@ -20,10 +20,16 @@ export const initSocketServer = (httpServer: HttpServer): SocketIOServer => {
     ioServer = new SocketIOServer(httpServer, {
       cors: {
         origin: (requestOrigin, callback) => {
-          if (!requestOrigin || allowedOrigins.includes("*") || env.NODE_ENV === "development") {
+          if (!requestOrigin) {
             return callback(null, true);
           }
-          return callback(null, allowedOrigins.includes(requestOrigin) ? requestOrigin : false);
+          const isAllowed =
+            allowedOrigins.includes("*") ||
+            allowedOrigins.includes(requestOrigin) ||
+            env.NODE_ENV === "development" ||
+            /^https?:\/\/(localhost|127\.0\.0\.1):(5173|8080|3000|4173)$/.test(requestOrigin);
+
+          return callback(null, isAllowed);
         },
         credentials: true,
       },

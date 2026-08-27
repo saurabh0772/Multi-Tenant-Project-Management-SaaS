@@ -13,7 +13,7 @@ export const notificationApi = {
     params?: ListNotificationsParams
   ): Promise<{ notifications: Notification[]; meta: ApiResponse<unknown>["meta"] }> => {
     const res = await apiClient.get<ApiResponse<Notification[]>>(
-      `/api/v1/organizations/${orgId}/notifications`,
+      `/organizations/${orgId}/notifications`,
       { params }
     );
     return {
@@ -24,7 +24,7 @@ export const notificationApi = {
 
   getUnreadCount: async (orgId: string): Promise<number> => {
     const res = await apiClient.get<ApiResponse<{ unreadCount: number }>>(
-      `/api/v1/organizations/${orgId}/notifications/unread-count`
+      `/organizations/${orgId}/notifications/unread-count`
     );
     return res.data.data.unreadCount;
   },
@@ -34,14 +34,14 @@ export const notificationApi = {
     notificationId: string
   ): Promise<Notification> => {
     const res = await apiClient.patch<ApiResponse<Notification>>(
-      `/api/v1/organizations/${orgId}/notifications/${notificationId}/read`
+      `/organizations/${orgId}/notifications/${notificationId}/read`
     );
     return res.data.data;
   },
 
   markAllRead: async (orgId: string): Promise<{ count: number }> => {
     const res = await apiClient.patch<ApiResponse<{ count: number }>>(
-      `/api/v1/organizations/${orgId}/notifications/read-all`
+      `/organizations/${orgId}/notifications/read-all`
     );
     return res.data.data;
   },

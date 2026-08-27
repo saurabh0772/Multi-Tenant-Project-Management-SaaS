@@ -13,7 +13,7 @@ export const attachmentApi = {
     if (parent.commentId) formData.append("commentId", parent.commentId);
 
     const res = await apiClient.post<ApiResponse<Attachment>>(
-      `/api/v1/organizations/${orgId}/attachments`,
+      `/organizations/${orgId}/attachments`,
       formData,
       {
         headers: {
@@ -25,8 +25,8 @@ export const attachmentApi = {
   },
 
   getDownloadUrl: (orgId: string, attachmentId: string): string => {
-    const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-    return `${baseURL}/api/v1/organizations/${orgId}/attachments/${attachmentId}/download`;
+    const baseURL = import.meta.env.VITE_API_URL || "/api/v1";
+    return `${baseURL}/organizations/${orgId}/attachments/${attachmentId}/download`;
   },
 
   deleteAttachment: async (
@@ -34,7 +34,7 @@ export const attachmentApi = {
     attachmentId: string
   ): Promise<void> => {
     await apiClient.delete(
-      `/api/v1/organizations/${orgId}/attachments/${attachmentId}`
+      `/organizations/${orgId}/attachments/${attachmentId}`
     );
   },
 };

@@ -8,7 +8,40 @@ import { attachmentController } from "../controllers/attachment.controller.js";
 
 const router = Router({ mergeParams: true });
 
-// --- Task Attachment Upload & Listing ---
+// --- Organization Level Attachments (/organizations/:orgId/attachments) ---
+router.post(
+  "/attachments",
+  authenticate,
+  requireOrganizationMember,
+  requirePermission(PERMISSIONS.ATTACHMENT_UPLOAD),
+  uploadSingleFile,
+  attachmentController.uploadAttachment
+);
+
+router.get(
+  "/attachments",
+  authenticate,
+  requireOrganizationMember,
+  requirePermission(PERMISSIONS.ATTACHMENT_READ),
+  attachmentController.getAttachments
+);
+
+router.get(
+  "/attachments/:attachmentId/download",
+  authenticate,
+  requireOrganizationMember,
+  requirePermission(PERMISSIONS.ATTACHMENT_READ),
+  attachmentController.downloadAttachment
+);
+
+router.delete(
+  "/attachments/:attachmentId",
+  authenticate,
+  requireOrganizationMember,
+  attachmentController.deleteAttachment
+);
+
+// --- Task Attachment Legacy Routes ---
 router.post(
   "/tasks/:taskId/attachments",
   authenticate,
@@ -26,7 +59,7 @@ router.get(
   attachmentController.getTaskAttachments
 );
 
-// --- Comment Attachment Upload & Listing ---
+// --- Comment Attachment Legacy Routes ---
 router.post(
   "/comments/:commentId/attachments",
   authenticate,
@@ -42,22 +75,6 @@ router.get(
   requireOrganizationMember,
   requirePermission(PERMISSIONS.ATTACHMENT_READ),
   attachmentController.getCommentAttachments
-);
-
-// --- Attachment Level Access & Deletion ---
-router.get(
-  "/attachments/:attachmentId/download",
-  authenticate,
-  requireOrganizationMember,
-  requirePermission(PERMISSIONS.ATTACHMENT_READ),
-  attachmentController.downloadAttachment
-);
-
-router.delete(
-  "/attachments/:attachmentId",
-  authenticate,
-  requireOrganizationMember,
-  attachmentController.deleteAttachment
 );
 
 export default router;

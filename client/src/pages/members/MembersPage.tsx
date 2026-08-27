@@ -40,8 +40,14 @@ export const MembersPage: React.FC = () => {
     try {
       await orgApi.updateMember(activeOrg._id, memberId, { role });
       await queryClient.invalidateQueries({ queryKey: ["members"] });
-    } catch {
-      alert("Failed to update member role.");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const apiErr = err as any;
+      alert(
+        apiErr.response?.data?.error?.message ||
+          apiErr.message ||
+          "Failed to update member role."
+      );
     }
   };
 
@@ -50,8 +56,14 @@ export const MembersPage: React.FC = () => {
     try {
       await orgApi.updateMember(activeOrg._id, memberId, { status });
       await queryClient.invalidateQueries({ queryKey: ["members"] });
-    } catch {
-      alert("Failed to update member status.");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const apiErr = err as any;
+      alert(
+        apiErr.response?.data?.error?.message ||
+          apiErr.message ||
+          "Failed to update member status."
+      );
     }
   };
 
@@ -60,8 +72,14 @@ export const MembersPage: React.FC = () => {
     try {
       await orgApi.removeMember(activeOrg._id, memberId);
       await queryClient.invalidateQueries({ queryKey: ["members"] });
-    } catch {
-      alert("Failed to remove member.");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const apiErr = err as any;
+      alert(
+        apiErr.response?.data?.error?.message ||
+          apiErr.message ||
+          "Failed to remove member."
+      );
     }
   };
 
