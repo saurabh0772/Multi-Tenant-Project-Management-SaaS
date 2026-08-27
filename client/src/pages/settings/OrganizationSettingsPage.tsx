@@ -23,10 +23,12 @@ export const OrganizationSettingsPage: React.FC = () => {
     if (activeOrg) {
       setName(activeOrg.name || "");
       setLogoUrl(activeOrg.logoUrl || "");
-      setTimezone(activeOrg.timezone || "UTC");
-      setDateFormat(activeOrg.dateFormat || "YYYY-MM-DD");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const activeOrgAny = activeOrg as any;
+      setTimezone(activeOrg.timezone || activeOrgAny.settings?.timezone || "UTC");
+      setDateFormat(activeOrg.dateFormat || activeOrgAny.settings?.dateFormat || "YYYY-MM-DD");
     }
-  }, [activeOrg]);
+  }, [activeOrg?._id]);
 
   const { data: members = [] } = useQuery({
     queryKey: ["members", activeOrg?._id],
@@ -59,9 +61,12 @@ export const OrganizationSettingsPage: React.FC = () => {
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const apiErr = err as any;
-      setError(
-        apiErr.response?.data?.error?.message || "Failed to update settings."
-      );
+      const errorMsg =
+        apiErr.response?.data?.error?.message ||
+        apiErr.response?.data?.message ||
+        apiErr.message ||
+        "Failed to update settings.";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

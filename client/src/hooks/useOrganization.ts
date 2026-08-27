@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore.js";
 import { orgApi } from "../api/org.api.js";
@@ -106,15 +107,22 @@ export function useOrganization() {
     (item) => getOrgId(item) === activeOrgId
   );
 
-  const activeOrg: Organization | null = activeItem
-    ? {
-        _id: getOrgId(activeItem),
-        id: getOrgId(activeItem),
-        name: activeItem.name || activeItem.organization?.name || "",
-        slug: activeItem.slug || activeItem.organization?.slug || "",
-        logoUrl: activeItem.logoUrl ?? activeItem.organization?.logoUrl,
-      }
-    : null;
+  const activeOrg = useMemo<Organization | null>(() => {
+    if (!activeItem) return null;
+    const orgId = getOrgId(activeItem);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemAny = activeItem as any;
+    const settings = itemAny.settings || itemAny.organization?.settings || {};
+    return {
+      _id: orgId,
+      id: orgId,
+      name: activeItem.name || activeItem.organization?.name || "",
+      slug: activeItem.slug || activeItem.organization?.slug || "",
+      logoUrl: activeItem.logoUrl ?? activeItem.organization?.logoUrl,
+      timezone: settings.timezone || "UTC",
+      dateFormat: settings.dateFormat || "YYYY-MM-DD",
+    };
+  }, [activeItem]);
 
   const activeRole: OrganizationRole | null = activeItem?.role || null;
 
