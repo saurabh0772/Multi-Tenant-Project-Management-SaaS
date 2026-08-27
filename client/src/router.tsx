@@ -10,6 +10,8 @@ import { NotificationsPage } from "./pages/notifications/NotificationsPage.js";
 import { OrganizationSettingsPage } from "./pages/settings/OrganizationSettingsPage.js";
 import { AnalyticsPage } from "./pages/analytics/AnalyticsPage.js";
 
+import { AcceptInvitationPage } from "./pages/auth/AcceptInvitationPage.js";
+
 export const router = createBrowserRouter([
   // Public Auth Routes
   {
@@ -19,6 +21,10 @@ export const router = createBrowserRouter([
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+  {
+    path: "/accept-invitation",
+    element: <AcceptInvitationPage />,
   },
 
   // Protected SaaS Routes

@@ -97,11 +97,10 @@ export const orgApi = {
   inviteMember: async (
     orgId: string,
     params: { email: string; role: OrganizationRole }
-  ): Promise<Invitation> => {
-    const res = await apiClient.post<ApiResponse<Invitation>>(
-      `/api/v1/organizations/${orgId}/invitations`,
-      params
-    );
+  ): Promise<{ message: string; invitation: Invitation; token?: string }> => {
+    const res = await apiClient.post<
+      ApiResponse<{ message: string; invitation: Invitation; token?: string }>
+    >(`/api/v1/organizations/${orgId}/invitations`, params);
     return res.data.data;
   },
 
@@ -116,5 +115,14 @@ export const orgApi = {
     await apiClient.delete(
       `/api/v1/organizations/${orgId}/invitations/${invitationId}`
     );
+  },
+
+  acceptInvitation: async (
+    token: string
+  ): Promise<{ message: string; organizationId: string }> => {
+    const res = await apiClient.post<
+      ApiResponse<{ message: string; organizationId: string }>
+    >(`/api/v1/invitations/${token}/accept`);
+    return res.data.data;
   },
 };
