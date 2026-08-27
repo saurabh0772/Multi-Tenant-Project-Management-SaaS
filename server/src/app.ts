@@ -64,8 +64,10 @@ export const createApp = (): Express => {
         "Content-Type",
         "Authorization",
         "X-Request-ID",
+        "x-request-id",
         "X-Organization-ID",
         "x-organization-id",
+        "X-Organization-Id",
       ],
     })
   );
