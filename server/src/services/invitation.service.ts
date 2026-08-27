@@ -107,27 +107,44 @@ export class InvitationService {
     const { invitations, total, page, limit } =
       await invitationRepository.findOrgInvitations(organizationId, options);
 
-    const data = invitations.map((inv) => ({
-      _id: inv._id.toString(),
-      id: inv._id.toString(),
-      email: inv.email,
-      role: inv.role,
-      status: inv.status,
-      token: inv.rawToken || null,
-      expiresAt: inv.expiresAt,
-      acceptedAt: inv.acceptedAt || null,
-      createdAt: inv.createdAt,
-      invitedBy: inv.invitedBy
-        ? {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            id: (inv.invitedBy as any)._id?.toString() || inv.invitedBy.toString(),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            name: (inv.invitedBy as any).name,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            email: (inv.invitedBy as any).email,
-          }
-        : null,
-    }));
+    const data = await Promise.all(
+      invitations.map(async (inv) => {
+        let token = inv.rawToken;
+        if (!token && inv.status === "PENDING") {
+          token = crypto.randomBytes(32).toString("hex");
+          const tokenHash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+          await invitationRepository["model"].updateOne(
+            { _id: inv._id },
+            { rawToken: token, tokenHash }
+          );
+        }
+
+        return {
+          _id: inv._id.toString(),
+          id: inv._id.toString(),
+          email: inv.email,
+          role: inv.role,
+          status: inv.status,
+          token: token || null,
+          expiresAt: inv.expiresAt,
+          acceptedAt: inv.acceptedAt || null,
+          createdAt: inv.createdAt,
+          invitedBy: inv.invitedBy
+            ? {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                id: (inv.invitedBy as any)._id?.toString() || inv.invitedBy.toString(),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                name: (inv.invitedBy as any).name,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                email: (inv.invitedBy as any).email,
+              }
+            : null,
+        };
+      })
+    );
 
     return {
       invitations: data,
