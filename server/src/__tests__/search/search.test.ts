@@ -231,13 +231,56 @@ describe("Phase 13 — Advanced Search & Tenant Isolation Test Suite", () => {
     });
     const token = loginRes.body.data.accessToken;
 
-    // Pass $where operator injection
-    const res = await request(app)
-      .get(`/api/v1/organizations/${org._id.toString()}/search?q=$where`)
-      .set("Authorization", `Bearer ${token}`);
+    const forbiddenQueries = ["$where", "$expr", "$function", "$regex", "$or", "$and"];
+    for (const q of forbiddenQueries) {
+      const res = await request(app)
+        .get(`/api/v1/organizations/${org._id.toString()}/search?q=${q}`)
+        .set("Authorization", `Bearer ${token}`);
 
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+    }
+  });
+
+  it("should reject invalid pagination parameters", async () => {
+    const passwordHash = await hashPassword("Password123!");
+    const user = await User.create({
+      name: "Pagination User",
+      email: "pagination.user@example.com",
+      passwordHash,
+      status: "ACTIVE",
+    });
+
+    const org = await Organization.create({
+      name: "Pagination Org",
+      slug: "pagination-org",
+      ownerId: user._id,
+    });
+
+    await Membership.create({
+      userId: user._id,
+      organizationId: org._id,
+      role: "OWNER",
+      status: "ACTIVE",
+    });
+
+    const loginRes = await request(app).post("/api/v1/auth/login").send({
+      email: "pagination.user@example.com",
+      password: "Password123!",
+    });
+    const token = loginRes.body.data.accessToken;
+
+    // Test limit > 100
+    const resLimitHigh = await request(app)
+      .get(`/api/v1/organizations/${org._id.toString()}/search?limit=150`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(resLimitHigh.status).toBe(400);
+
+    // Test page <= 0
+    const resPageZero = await request(app)
+      .get(`/api/v1/organizations/${org._id.toString()}/search?page=0`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(resPageZero.status).toBe(400);
   });
 });
