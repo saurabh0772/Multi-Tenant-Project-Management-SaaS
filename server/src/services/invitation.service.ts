@@ -106,6 +106,7 @@ export class InvitationService {
       await invitationRepository.findOrgInvitations(organizationId, options);
 
     const data = invitations.map((inv) => ({
+      _id: inv._id.toString(),
       id: inv._id.toString(),
       email: inv.email,
       role: inv.role,

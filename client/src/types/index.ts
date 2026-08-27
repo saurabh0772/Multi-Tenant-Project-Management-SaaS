@@ -141,7 +141,8 @@ export interface Activity {
 
 export interface Invitation {
   _id: string;
-  organizationId: string;
+  id?: string;
+  organizationId?: string;
   email: string;
   role: OrganizationRole;
   invitedBy: string;

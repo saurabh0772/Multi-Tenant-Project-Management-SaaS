@@ -220,29 +220,32 @@ export const MembersPage: React.FC = () => {
           </h2>
 
           <div className="space-y-2">
-            {invitations.map((inv) => (
-              <div
-                key={inv._id}
-                className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800/60 rounded-2xl text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-blue-400" />
-                  <div>
-                    <span className="font-semibold text-white">{inv.email}</span>
-                    <span className="ml-2 text-[10px] text-slate-400 font-mono">
-                      Role: {inv.role}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleRevokeInvitation(inv._id)}
-                  className="px-3 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-xs transition-all"
+            {invitations.map((inv) => {
+              const invId = inv._id || inv.id || "";
+              return (
+                <div
+                  key={invId}
+                  className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800/60 rounded-2xl text-xs"
                 >
-                  Revoke
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-4 h-4 text-blue-400" />
+                    <div>
+                      <span className="font-semibold text-white">{inv.email}</span>
+                      <span className="ml-2 text-[10px] text-slate-400 font-mono">
+                        Role: {inv.role}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleRevokeInvitation(invId)}
+                    className="px-3 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-xs transition-all"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
