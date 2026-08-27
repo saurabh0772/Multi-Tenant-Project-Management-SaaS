@@ -1,15 +1,19 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import { AuthLayout } from "../../components/layout/AuthLayout.js";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
+  const initialEmail = searchParams.get("email") || "";
+
   const { register } = useAuth();
 
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +32,7 @@ export const RegisterPage: React.FC = () => {
 
     try {
       await register({ name, email, password });
-      navigate("/dashboard");
+      navigate(redirectTarget);
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const apiErr = err as any;

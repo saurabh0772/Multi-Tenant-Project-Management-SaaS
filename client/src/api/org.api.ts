@@ -125,4 +125,27 @@ export const orgApi = {
     >(`/api/v1/invitations/${token}/accept`);
     return res.data.data;
   },
+
+  getInvitationDetails: async (
+    token: string
+  ): Promise<{
+    id: string;
+    email: string;
+    role: OrganizationRole;
+    status: string;
+    expiresAt: string;
+    organization?: { id: string; name: string; slug: string; logoUrl?: string | null } | null;
+  }> => {
+    const res = await apiClient.get<
+      ApiResponse<{
+        id: string;
+        email: string;
+        role: OrganizationRole;
+        status: string;
+        expiresAt: string;
+        organization?: { id: string; name: string; slug: string; logoUrl?: string | null } | null;
+      }>
+    >(`/api/v1/invitations/${token}`);
+    return res.data.data;
+  },
 };

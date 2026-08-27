@@ -4,6 +4,7 @@ import { invitationRepository, FindOrgInvitationsOptions } from "../repositories
 import { userRepository } from "../repositories/user.repository.js";
 import { membershipRepository } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
+import { organizationRepository } from "../repositories/organization.repository.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import { CreateInvitationInput } from "../validators/invitation.schema.js";
@@ -180,6 +181,39 @@ export class InvitationService {
 
     return {
       message: "Invitation revoked successfully",
+    };
+  }
+
+  /**
+   * Public lookup of invitation details by raw token for previewing before acceptance.
+   */
+  public async getInvitationDetails(rawToken: string) {
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    const invitation = await invitationRepository.findByTokenHash(tokenHash);
+    if (!invitation) {
+      throw new AppError("Invalid or expired invitation token", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const org = await organizationRepository.findById(invitation.organizationId.toString());
+
+    return {
+      id: invitation._id.toString(),
+      email: invitation.email,
+      role: invitation.role,
+      status: invitation.expiresAt < new Date() ? "EXPIRED" : invitation.status,
+      expiresAt: invitation.expiresAt,
+      organization: org
+        ? {
+            id: org._id.toString(),
+            name: org.name,
+            slug: org.slug,
+            logoUrl: org.logoUrl,
+          }
+        : null,
     };
   }
 

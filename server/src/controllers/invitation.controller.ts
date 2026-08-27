@@ -79,6 +79,24 @@ export class InvitationController {
     }
   };
 
+  public getInvitationDetails = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { token } = req.params;
+      const result = await invitationService.getInvitationDetails(token);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public acceptInvitation = async (
     req: Request,
     res: Response,
