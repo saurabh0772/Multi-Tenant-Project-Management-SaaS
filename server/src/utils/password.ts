@@ -17,9 +17,12 @@ export const hashPassword = async (password: string): Promise<string> => {
  */
 export const verifyPassword = async (
   password: string,
-  passwordHash: string
+  passwordHash?: string | null
 ): Promise<boolean> => {
   try {
+    if (!passwordHash || typeof passwordHash !== "string") {
+      return false;
+    }
     return await argon2.verify(passwordHash, password);
   } catch {
     return false;

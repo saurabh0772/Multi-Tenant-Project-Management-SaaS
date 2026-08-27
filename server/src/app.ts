@@ -59,7 +59,16 @@ export const createApp = (): Express => {
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["*"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Request-ID",
+      "x-request-id",
+      "X-Organization-ID",
+      "x-organization-id",
+      "X-Organization-Id",
+      "x-organization-ID",
+    ],
   });
 
   app.use(corsMiddleware);
