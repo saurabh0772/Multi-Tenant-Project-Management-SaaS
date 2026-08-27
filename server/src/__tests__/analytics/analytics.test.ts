@@ -8,6 +8,7 @@ import { Membership as Member } from "../../models/membership.model.js";
 import { Project } from "../../models/project.model.js";
 import { Task } from "../../models/task.model.js";
 import { generateAccessToken } from "../../utils/jwt.js";
+import { env } from "../../config/env.js";
 
 const app = createApp();
 
@@ -29,9 +30,8 @@ describe("Phase 12 — Analytics & Reporting Security and Integration Suite", ()
   let projectB1: InstanceType<typeof Project>;
 
   beforeAll(async () => {
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/saas-test-analytics";
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(mongoUri);
+      await mongoose.connect(env.MONGODB_TEST_URI);
     }
   });
 

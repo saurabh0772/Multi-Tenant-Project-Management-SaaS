@@ -1,10 +1,25 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
+import mongoose from "mongoose";
 import { createApp } from "../app.js";
+import { env } from "../config/env.js";
 
 const app = createApp();
 
-describe("GET /health", () => {
+describe("Health & API System Suite", () => {
+  beforeAll(async () => {
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(env.MONGODB_TEST_URI);
+    }
+  });
+
+  afterAll(async () => {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+    }
+  });
+
+  describe("GET /health", () => {
   it("should return HTTP 200 OK with liveness status", async () => {
     const response = await request(app).get("/health");
 
@@ -46,4 +61,5 @@ describe("404 Not Found Handler", () => {
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe("NOT_FOUND");
   });
+});
 });
