@@ -1,9 +1,10 @@
 export interface User {
   _id: string;
+  id?: string;
   name: string;
   email: string;
-  status: "ACTIVE" | "SUSPENDED";
-  createdAt: string;
+  status?: "ACTIVE" | "SUSPENDED";
+  createdAt?: string;
 }
 
 export type OrganizationRole = "OWNER" | "ADMIN" | "MANAGER" | "MEMBER";
@@ -11,13 +12,14 @@ export type MembershipStatus = "ACTIVE" | "SUSPENDED";
 
 export interface Organization {
   _id: string;
+  id?: string;
   name: string;
   slug: string;
-  ownerId: string;
+  ownerId?: string;
   logoUrl?: string | null;
   timezone?: string;
   dateFormat?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Membership {

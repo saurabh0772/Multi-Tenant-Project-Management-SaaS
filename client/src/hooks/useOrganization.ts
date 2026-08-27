@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore.js";
 import { orgApi } from "../api/org.api.js";
-import { OrganizationRole } from "../types/index.js";
+import { Organization, OrganizationRole } from "../types/index.js";
 
 const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
   OWNER: [
@@ -99,11 +99,23 @@ export function useOrganization() {
     enabled: isAuthenticated,
   });
 
+  const getOrgId = (item: (typeof orgsData)[number]) =>
+    item.id || item._id || item.organization?._id || item.organization?.id || "";
+
   const activeItem = orgsData.find(
-    (item) => item.organization._id === activeOrgId
+    (item) => getOrgId(item) === activeOrgId
   );
 
-  const activeOrg = activeItem?.organization || null;
+  const activeOrg: Organization | null = activeItem
+    ? {
+        _id: getOrgId(activeItem),
+        id: getOrgId(activeItem),
+        name: activeItem.name || activeItem.organization?.name || "",
+        slug: activeItem.slug || activeItem.organization?.slug || "",
+        logoUrl: activeItem.logoUrl ?? activeItem.organization?.logoUrl,
+      }
+    : null;
+
   const activeRole: OrganizationRole | null = activeItem?.role || null;
 
   const hasPermission = (permission: string): boolean => {
@@ -113,7 +125,13 @@ export function useOrganization() {
   };
 
   return {
-    organizations: orgsData.map((d) => d.organization),
+    organizations: orgsData.map((d) => ({
+      _id: getOrgId(d),
+      id: getOrgId(d),
+      name: d.name || d.organization?.name || "",
+      slug: d.slug || d.organization?.slug || "",
+      logoUrl: d.logoUrl ?? d.organization?.logoUrl,
+    })),
     activeOrg,
     activeOrgId,
     activeRole,

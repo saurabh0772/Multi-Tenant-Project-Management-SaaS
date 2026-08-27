@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                   Your Organizations
                 </div>
                 <div className="max-h-56 overflow-y-auto space-y-1">
-                  {organizations.map((org) => (
+                  {organizations.filter((org): org is NonNullable<typeof org> => !!org).map((org) => (
                     <button
                       key={org._id}
                       onClick={() => {

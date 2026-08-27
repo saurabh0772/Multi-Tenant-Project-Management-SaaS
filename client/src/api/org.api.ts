@@ -23,13 +23,21 @@ export interface UpdateOrgParams {
   dateFormat?: string;
 }
 
+export interface OrganizationListItem {
+  id?: string;
+  _id?: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  role: OrganizationRole;
+  organization?: Organization;
+}
+
 export const orgApi = {
-  listOrganizations: async (): Promise<
-    Array<{ organization: Organization; role: OrganizationRole }>
-  > => {
-    const res = await apiClient.get<
-      ApiResponse<Array<{ organization: Organization; role: OrganizationRole }>>
-    >("/api/v1/organizations");
+  listOrganizations: async (): Promise<OrganizationListItem[]> => {
+    const res = await apiClient.get<ApiResponse<OrganizationListItem[]>>(
+      "/api/v1/organizations"
+    );
     return res.data.data;
   },
 

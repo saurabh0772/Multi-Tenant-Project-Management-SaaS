@@ -23,19 +23,19 @@ export function useAuth() {
       setUser(me);
 
       const orgsData = await orgApi.listOrganizations();
+      const getOrgId = (item: (typeof orgsData)[number]) =>
+        item.id || item._id || item.organization?._id || item.organization?.id || "";
+
       const memberships = orgsData.map((item) => ({
-        organizationId: item.organization._id,
+        organizationId: getOrgId(item),
         role: item.role,
       }));
       setUserMemberships(memberships);
 
       if (orgsData.length > 0) {
-        // If current activeOrgId is valid, keep it; otherwise set to first org
-        const hasActive = orgsData.some(
-          (o) => o.organization._id === activeOrgId
-        );
+        const hasActive = orgsData.some((o) => getOrgId(o) === activeOrgId);
         if (!hasActive) {
-          setActiveOrgId(orgsData[0].organization._id);
+          setActiveOrgId(getOrgId(orgsData[0]));
         }
       } else {
         setActiveOrgId(null);
@@ -54,14 +54,17 @@ export function useAuth() {
       setUser(data.user);
 
       const orgsData = await orgApi.listOrganizations();
+      const getOrgId = (item: (typeof orgsData)[number]) =>
+        item.id || item._id || item.organization?._id || item.organization?.id || "";
+
       const memberships = orgsData.map((item) => ({
-        organizationId: item.organization._id,
+        organizationId: getOrgId(item),
         role: item.role,
       }));
       setUserMemberships(memberships);
 
       if (orgsData.length > 0) {
-        setActiveOrgId(orgsData[0].organization._id);
+        setActiveOrgId(getOrgId(orgsData[0]));
       }
       return data;
     } finally {
