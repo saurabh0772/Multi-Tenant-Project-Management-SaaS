@@ -145,9 +145,11 @@ export interface Invitation {
   organizationId?: string;
   email: string;
   role: OrganizationRole;
-  invitedBy: string;
-  token?: string;
+  status?: "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+  invitedBy?: string | { id?: string; name?: string; email?: string } | null;
+  token?: string | null;
   expiresAt: string;
+  acceptedAt?: string | null;
   createdAt: string;
 }
 

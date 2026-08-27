@@ -39,10 +39,8 @@ export class InvitationRepository extends BaseRepository<IInvitationDocument> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filter: Record<string, any> = { organizationId };
 
-    if (options.status) {
+    if (options.status && options.status !== "ALL") {
       filter.status = options.status;
-    } else {
-      filter.status = "PENDING";
     }
 
     const [invitations, total] = await Promise.all([

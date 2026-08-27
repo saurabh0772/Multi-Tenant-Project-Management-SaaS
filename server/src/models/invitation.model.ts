@@ -10,6 +10,7 @@ export interface IInvitation {
   invitedBy: Types.ObjectId;
   role: InvitationRole;
   tokenHash: string;
+  rawToken?: string | null;
   status: InvitationStatus;
   expiresAt: Date;
   acceptedAt?: Date | null;
@@ -47,6 +48,10 @@ const invitationSchema = new Schema<IInvitationDocument>(
       type: String,
       required: [true, "Token hash is required"],
       select: false,
+    },
+    rawToken: {
+      type: String,
+      default: null,
     },
     status: {
       type: String,

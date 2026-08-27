@@ -70,6 +70,7 @@ export class InvitationService {
       invitedBy: new Types.ObjectId(actorUserId),
       role: input.role,
       tokenHash,
+      rawToken,
       status: "PENDING",
       expiresAt,
     });
@@ -112,7 +113,9 @@ export class InvitationService {
       email: inv.email,
       role: inv.role,
       status: inv.status,
+      token: inv.rawToken || null,
       expiresAt: inv.expiresAt,
+      acceptedAt: inv.acceptedAt || null,
       createdAt: inv.createdAt,
       invitedBy: inv.invitedBy
         ? {
