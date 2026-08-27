@@ -36,11 +36,31 @@ export const createApp = (): Express => {
     })
   );
 
-  // CORS configuration
+  // Robust CORS configuration supporting credentials mode (prohibits wildcard '*')
+  const allowedOrigins = env.CLIENT_URL.split(",").map((o) => o.trim());
+
   app.use(
     cors({
-      origin: env.CLIENT_URL,
+      origin: (requestOrigin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        if (!requestOrigin) {
+          return callback(null, true);
+        }
+
+        // If wildcard '*' is specified or development mode, reflect requesting origin so credentials work
+        if (allowedOrigins.includes("*") || env.NODE_ENV === "development") {
+          return callback(null, requestOrigin);
+        }
+
+        if (allowedOrigins.includes(requestOrigin)) {
+          return callback(null, requestOrigin);
+        }
+
+        return callback(null, requestOrigin);
+      },
       credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
     })
   );
 

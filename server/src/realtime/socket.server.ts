@@ -15,9 +15,16 @@ let subClient: Redis | null = null;
 
 export const initSocketServer = (httpServer: HttpServer): SocketIOServer => {
   if (!ioServer) {
+    const allowedOrigins = env.CLIENT_URL.split(",").map((o) => o.trim());
+
     ioServer = new SocketIOServer(httpServer, {
       cors: {
-        origin: env.CLIENT_URL,
+        origin: (requestOrigin, callback) => {
+          if (!requestOrigin || allowedOrigins.includes("*") || env.NODE_ENV === "development") {
+            return callback(null, true);
+          }
+          return callback(null, allowedOrigins.includes(requestOrigin) ? requestOrigin : false);
+        },
         credentials: true,
       },
       pingTimeout: 30000,

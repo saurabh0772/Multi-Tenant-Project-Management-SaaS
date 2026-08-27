@@ -167,7 +167,7 @@ const seedDatabase = async () => {
 
     // 5. Seed Tasks
     logger.info("Seeding Tasks...");
-    const task1 = await Task.create({
+    await Task.create({
       organizationId: acmeOrg._id,
       projectId: backendProject._id,
       title: "Setup JWT Auth & Session Architecture",
@@ -195,7 +195,7 @@ const seedDatabase = async () => {
       dueDate: new Date(Date.now() + 86400000 * 3), // 3 days from now
     });
 
-    const task3 = await Task.create({
+    await Task.create({
       organizationId: acmeOrg._id,
       projectId: backendProject._id,
       title: "Configure BullMQ Notification Queue Workers",
@@ -209,7 +209,7 @@ const seedDatabase = async () => {
       dueDate: new Date(Date.now() + 86400000 * 5),
     });
 
-    const task4 = await Task.create({
+    await Task.create({
       organizationId: acmeOrg._id,
       projectId: frontendProject._id,
       title: "Design Global Search Command Palette (Ctrl+K)",
