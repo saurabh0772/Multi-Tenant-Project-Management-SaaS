@@ -27,13 +27,19 @@ export const authenticate = (
   _res: Response,
   next: NextFunction
 ): void => {
-  const authHeader = req.headers.authorization;
+  let token: string | undefined;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  } else if (req.cookies && req.cookies.accessToken) {
+    token = req.cookies.accessToken;
+  }
+
+  if (!token) {
     throw new AppError("Authentication token required", 401, "UNAUTHORIZED");
   }
 
-  const token = authHeader.split(" ")[1];
   const payload = verifyAccessToken(token);
 
   req.user = {

@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { User, OrganizationRole } from "../types/index.js";
-import { getAccessToken } from "../api/axios.js";
 
 interface UserOrgMembership {
   organizationId: string;
@@ -29,7 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) =>
     set({
       user,
-      isAuthenticated: !!user && !!getAccessToken(),
+      isAuthenticated: !!user,
       isLoading: false,
     }),
   setIsLoading: (isLoading) => set({ isLoading }),
