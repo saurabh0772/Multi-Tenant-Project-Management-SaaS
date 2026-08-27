@@ -114,16 +114,33 @@ export const MembersPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {members.map((m) => {
+                  const memberId = m._id || m.id || "";
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const userObj = m.userId as any;
+                  const userObj = (typeof m.userId === "object" ? m.userId : m.user) as any;
                   const name = userObj?.name || "Member";
                   const email = userObj?.email || "";
+                  const initials = name
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .filter(Boolean)
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2) || "U";
 
                   return (
-                    <tr key={m._id} className="hover:bg-slate-800/30 transition-all">
+                    <tr key={memberId} className="hover:bg-slate-800/30 transition-all">
                       <td className="py-3 px-2">
-                        <div className="font-semibold text-white">{name}</div>
-                        <div className="text-[10px] text-slate-400">{email}</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold text-xs flex items-center justify-center shadow-md shrink-0">
+                            {initials}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white">{name}</div>
+                            {email && (
+                              <div className="text-[10px] text-slate-400">{email}</div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       <td className="py-3 px-2">
@@ -131,7 +148,7 @@ export const MembersPage: React.FC = () => {
                           <select
                             value={m.role}
                             onChange={(e) =>
-                              handleRoleChange(m._id, e.target.value as OrganizationRole)
+                              handleRoleChange(memberId, e.target.value as OrganizationRole)
                             }
                             className="px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none"
                           >
@@ -151,7 +168,7 @@ export const MembersPage: React.FC = () => {
                           <select
                             value={m.status}
                             onChange={(e) =>
-                              handleStatusChange(m._id, e.target.value as MembershipStatus)
+                              handleStatusChange(memberId, e.target.value as MembershipStatus)
                             }
                             className="px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none"
                           >
@@ -178,7 +195,7 @@ export const MembersPage: React.FC = () => {
                       <td className="py-3 px-2 text-right">
                         {hasPermission("MEMBER_REMOVE") && m.role !== "OWNER" && (
                           <button
-                            onClick={() => handleRemoveMember(m._id)}
+                            onClick={() => handleRemoveMember(memberId)}
                             className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition-all"
                             title="Remove member"
                           >

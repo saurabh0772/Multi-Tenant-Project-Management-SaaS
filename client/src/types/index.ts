@@ -24,8 +24,16 @@ export interface Organization {
 
 export interface Membership {
   _id: string;
+  id?: string;
   userId: string | User;
-  organizationId: string;
+  user?: {
+    id?: string;
+    _id?: string;
+    name: string;
+    email: string;
+    avatarUrl?: string | null;
+  } | null;
+  organizationId?: string;
   role: OrganizationRole;
   status: MembershipStatus;
   joinedAt: string;
