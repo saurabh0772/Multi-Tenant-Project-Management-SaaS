@@ -1,16 +1,12 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
+import { healthController } from "../controllers/health.controller.js";
 
 const router = Router();
 
 /**
  * GET /health
- * Public process health check endpoint
+ * Public process liveness check endpoint
  */
-router.get("/", (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: "API is healthy",
-  });
-});
+router.get("/", healthController.getLiveness);
 
 export default router;

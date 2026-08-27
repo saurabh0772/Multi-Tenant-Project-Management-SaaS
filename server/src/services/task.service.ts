@@ -8,6 +8,7 @@ import { membershipRepository } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { notificationDispatcher } from "./notification-dispatcher.service.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import {
@@ -195,6 +196,8 @@ export class TaskService {
         createdTask._id.toString(),
         { task: result.task, actorId: actorUserId }
       );
+
+      searchService.invalidateSearchCache(organizationId);
 
       return result;
     });
@@ -390,6 +393,8 @@ export class TaskService {
       { task: formattedTask, actorId: actorUserId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return {
       task: formattedTask,
     };
@@ -468,6 +473,8 @@ export class TaskService {
         actorId: actorUserId,
       }
     );
+
+    searchService.invalidateSearchCache(organizationId);
 
     return {
       task: formattedTask,
@@ -552,6 +559,8 @@ export class TaskService {
       { task: formattedTask, assignedTo, actorId: actorUserId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return {
       task: formattedTask,
     };
@@ -603,6 +612,8 @@ export class TaskService {
         taskId,
         { taskId, actorId: actorUserId }
       );
+
+      searchService.invalidateSearchCache(organizationId);
 
       return result;
     });
@@ -658,6 +669,8 @@ export class TaskService {
       taskId,
       { task: formattedTask, actorId: actorUserId }
     );
+
+    searchService.invalidateSearchCache(organizationId);
 
     return {
       message: "Task restored successfully",

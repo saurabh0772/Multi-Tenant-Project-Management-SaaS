@@ -5,13 +5,18 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
+import { requestIdMiddleware } from "./middlewares/request-id.middleware.js";
 import healthRouter from "./routes/health.routes.js";
+import { healthController } from "./controllers/health.controller.js";
 import apiV1Router from "./routes/index.js";
 import { notFoundHandler } from "./middlewares/notFoundHandler.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 export const createApp = (): Express => {
   const app = express();
+
+  // Attach Request ID & performance tracking early
+  app.use(requestIdMiddleware);
 
   // Security headers
   app.use(helmet());
@@ -30,6 +35,11 @@ export const createApp = (): Express => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logger: logger as any,
       autoLogging: env.NODE_ENV !== "test",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      customProps: (req) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        requestId: (req as any).id,
+      }),
     })
   );
 
@@ -40,6 +50,9 @@ export const createApp = (): Express => {
 
   // Public process health check (unversioned)
   app.use("/health", healthRouter);
+
+  // Operational readiness check (unversioned)
+  app.get("/ready", healthController.getReadiness);
 
   // Versioned API routes
   app.use("/api/v1", apiV1Router);

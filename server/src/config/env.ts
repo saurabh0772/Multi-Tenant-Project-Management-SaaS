@@ -29,6 +29,10 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  SEARCH_CACHE_TTL: z.coerce.number().default(60),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
+  RATE_LIMIT_MAX: z.coerce.number().default(100),
+  SLOW_REQUEST_THRESHOLD_MS: z.coerce.number().default(500),
 });
 
 const parseEnv = () => {

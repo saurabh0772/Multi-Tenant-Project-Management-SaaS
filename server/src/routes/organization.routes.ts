@@ -14,6 +14,7 @@ import attachmentRouter from "./attachment.routes.js";
 import activityRouter from "./activity.routes.js";
 import notificationRouter from "./notification.routes.js";
 import { analyticsRouter } from "./analytics.routes.js";
+import searchRouter from "./search.routes.js";
 
 const router = Router({ mergeParams: true });
 
@@ -134,6 +135,9 @@ router.use("/:organizationId", activityRouter);
 // --- Task Organization Sub-Routes ---
 router.use("/:organizationId/tasks", taskRouter);
 router.use("/:organizationId/projects/:projectId/tasks", taskRouter);
+
+// --- Search Sub-Routes ---
+router.use("/:organizationId/search", searchRouter);
 
 // --- Analytics Sub-Routes ---
 router.use("/:organizationId/analytics", analyticsRouter);

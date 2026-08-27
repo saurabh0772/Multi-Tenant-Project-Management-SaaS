@@ -6,6 +6,7 @@ import {
 import { membershipRepository } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import {
@@ -163,6 +164,8 @@ export class ProjectService {
         createdProject._id.toString(),
         { project: result.project, actorId: actorUserId }
       );
+
+      searchService.invalidateSearchCache(organizationId);
 
       return result;
     });
@@ -326,6 +329,8 @@ export class ProjectService {
       { project: formattedProject, actorId: actorUserId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return {
       project: formattedProject,
     };
@@ -380,6 +385,8 @@ export class ProjectService {
       projectId,
       { project: formattedProject, actorId: actorUserId }
     );
+
+    searchService.invalidateSearchCache(organizationId);
 
     return {
       message: "Project archived successfully",
@@ -437,6 +444,8 @@ export class ProjectService {
       { project: formattedProject, actorId: actorUserId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return {
       message: "Project restored successfully",
       project: formattedProject,
@@ -489,6 +498,8 @@ export class ProjectService {
         projectId,
         { projectId, actorId: actorUserId }
       );
+
+      searchService.invalidateSearchCache(organizationId);
 
       return result;
     });

@@ -7,6 +7,7 @@ import { taskRepository } from "../repositories/task.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { notificationDispatcher } from "./notification-dispatcher.service.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import {
@@ -139,6 +140,8 @@ export class CommentService {
         { comment: result.comment, actorId: actorUserId }
       );
 
+      searchService.invalidateSearchCache(organizationId);
+
       return result;
     });
   }
@@ -261,6 +264,8 @@ export class CommentService {
       { comment: formattedComment, actorId: actorUserId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return {
       comment: formattedComment,
     };
@@ -332,6 +337,8 @@ export class CommentService {
         commentId,
         { commentId, actorId: actorUserId }
       );
+
+      searchService.invalidateSearchCache(organizationId);
 
       return result;
     });

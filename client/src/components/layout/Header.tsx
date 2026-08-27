@@ -14,6 +14,7 @@ import {
   Menu,
 } from "lucide-react";
 import { CreateOrgModal } from "../../features/organizations/CreateOrgModal.js";
+import { GlobalSearch } from "../../features/search/GlobalSearch.js";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -114,8 +115,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
           </div>
         </div>
 
-        {/* Right Section: Presence + Notifications + User Menu */}
+        {/* Right Section: Global Search + Presence + Notifications + User Menu */}
         <div className="flex items-center gap-3">
+          {/* Global Workspace Search */}
+          <GlobalSearch />
+
           {/* Presence Indicator */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

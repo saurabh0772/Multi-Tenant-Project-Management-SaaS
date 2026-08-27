@@ -5,14 +5,24 @@ import { createApp } from "../app.js";
 const app = createApp();
 
 describe("GET /health", () => {
-  it("should return HTTP 200 OK with success and message", async () => {
+  it("should return HTTP 200 OK with liveness status", async () => {
     const response = await request(app).get("/health");
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      success: true,
-      message: "API is healthy",
+      status: "ok",
+      service: "api",
     });
+  });
+});
+
+describe("GET /ready", () => {
+  it("should return readiness status check", async () => {
+    const response = await request(app).get("/ready");
+
+    expect([200, 503]).toContain(response.status);
+    expect(response.body).toHaveProperty("status");
+    expect(response.body).toHaveProperty("checks");
   });
 });
 

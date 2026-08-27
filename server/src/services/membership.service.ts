@@ -5,6 +5,7 @@ import {
 } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { OrganizationRole } from "../constants/roles.js";
 
@@ -151,6 +152,8 @@ export class MembershipService {
       { member: resultRole, actorId: actor.userId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return resultRole;
   }
 
@@ -224,6 +227,8 @@ export class MembershipService {
       { member: resultStatus, actorId: actor.userId }
     );
 
+    searchService.invalidateSearchCache(organizationId);
+
     return resultStatus;
   }
 
@@ -281,6 +286,8 @@ export class MembershipService {
       memberId,
       { memberId, actorId: actor.userId }
     );
+
+    searchService.invalidateSearchCache(organizationId);
 
     return {
       message: "Member removed successfully",

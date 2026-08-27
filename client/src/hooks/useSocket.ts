@@ -27,6 +27,7 @@ export function useSocket() {
       queryClient.invalidateQueries({ queryKey: ["tasks", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["activities", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["analytics", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["search", activeOrgId] });
     };
 
     // Project event handlers
@@ -34,12 +35,14 @@ export function useSocket() {
       queryClient.invalidateQueries({ queryKey: ["projects", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["activities", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["analytics", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["search", activeOrgId] });
     };
 
     // Comment event handlers
     const handleCommentEvent = () => {
       queryClient.invalidateQueries({ queryKey: ["comments"] });
       queryClient.invalidateQueries({ queryKey: ["activities", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["search", activeOrgId] });
     };
 
     // Attachment event handlers
@@ -52,6 +55,7 @@ export function useSocket() {
     const handleMemberEvent = () => {
       queryClient.invalidateQueries({ queryKey: ["members", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["search", activeOrgId] });
     };
 
     // Notification event handlers
