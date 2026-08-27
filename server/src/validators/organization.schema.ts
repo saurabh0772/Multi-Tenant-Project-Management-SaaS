@@ -36,7 +36,9 @@ export const updateOrganizationSchema = z
       .min(2, "Organization name must be at least 2 characters")
       .max(100, "Organization name cannot exceed 100 characters")
       .optional(),
-    logoUrl: z.string().url("Invalid logo URL").nullable().optional(),
+    logoUrl: z.union([z.string().url("Invalid logo URL"), z.literal("")]).nullable().optional(),
+    timezone: z.string().trim().optional(),
+    dateFormat: z.string().trim().optional(),
     settings: z
       .object({
         timezone: z.string().trim().optional(),

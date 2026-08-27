@@ -18,9 +18,13 @@ export interface CreateOrgParams {
 
 export interface UpdateOrgParams {
   name?: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
   timezone?: string;
   dateFormat?: string;
+  settings?: {
+    timezone?: string;
+    dateFormat?: string;
+  };
 }
 
 export interface OrganizationListItem {

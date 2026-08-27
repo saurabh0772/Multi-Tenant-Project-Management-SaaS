@@ -163,9 +163,20 @@ export class OrganizationService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updatePayload: Record<string, any> = {};
     if (input.name !== undefined) updatePayload.name = input.name;
-    if (input.logoUrl !== undefined) updatePayload.logoUrl = input.logoUrl;
-    if (input.settings !== undefined) {
-      updatePayload.settings = { ...org.settings, ...input.settings };
+    if (input.logoUrl !== undefined) updatePayload.logoUrl = input.logoUrl || null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputAny = input as any;
+    const tz = inputAny.timezone || input.settings?.timezone;
+    const df = inputAny.dateFormat || input.settings?.dateFormat;
+
+    if (tz !== undefined || df !== undefined || input.settings !== undefined) {
+      updatePayload.settings = {
+        ...org.settings,
+        ...(input.settings || {}),
+        ...(tz !== undefined ? { timezone: tz } : {}),
+        ...(df !== undefined ? { dateFormat: df } : {}),
+      };
     }
 
     const updatedOrg = await organizationRepository.update(

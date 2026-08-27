@@ -45,11 +45,16 @@ export const OrganizationSettingsPage: React.FC = () => {
     try {
       await orgApi.updateOrganization(activeOrg._id, {
         name,
-        logoUrl,
+        logoUrl: logoUrl || null,
         timezone,
         dateFormat,
+        settings: {
+          timezone,
+          dateFormat,
+        },
       });
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      await queryClient.invalidateQueries({ queryKey: ["members"] });
       setSuccess("Organization settings updated successfully.");
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
