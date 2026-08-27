@@ -1,4 +1,3 @@
-import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { Types } from "mongoose";
@@ -7,11 +6,10 @@ import { taskRepository } from "../repositories/task.repository.js";
 import { commentRepository } from "../repositories/comment.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { storageService } from "./storage.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import { IAttachmentDocument } from "../models/attachment.model.js";
-
-const UPLOADS_ROOT_DIR = path.resolve(process.cwd(), "uploads");
 
 export class AttachmentService {
   /**
@@ -105,16 +103,9 @@ export class AttachmentService {
       .replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueKey = `${Date.now()}_${crypto.randomBytes(8).toString("hex")}_${safeFileName}`;
     const relativeKey = path.join(organizationId, uniqueKey);
-    const absoluteFilePath = path.resolve(UPLOADS_ROOT_DIR, relativeKey);
 
-    if (!absoluteFilePath.startsWith(UPLOADS_ROOT_DIR)) {
-      throw new AppError("Invalid file storage path", 400, "VALIDATION_ERROR");
-    }
-
-    // 3. Write file bytes to disk
-    const targetDir = path.dirname(absoluteFilePath);
-    await fs.promises.mkdir(targetDir, { recursive: true });
-    await fs.promises.writeFile(absoluteFilePath, file.buffer);
+    // 3. Write file bytes via storage service
+    await storageService.saveFile(relativeKey, file.buffer);
 
     // 4. Try MongoDB transaction. If DB fails, execute compensating disk cleanup
     try {
@@ -185,8 +176,8 @@ export class AttachmentService {
         return result;
       });
     } catch (dbError) {
-      // Compensating file cleanup
-      await fs.promises.unlink(absoluteFilePath).catch(() => {});
+      // Compensating file cleanup via storage service
+      await storageService.deleteFile(relativeKey);
       throw dbError;
     }
   }
@@ -259,22 +250,18 @@ export class AttachmentService {
       throw new AppError("Attachment not found", 404, "RESOURCE_NOT_FOUND");
     }
 
-    const absoluteFilePath = path.resolve(
-      UPLOADS_ROOT_DIR,
-      attachment.storageKey
-    );
-
-    if (!absoluteFilePath.startsWith(UPLOADS_ROOT_DIR)) {
-      throw new AppError("Invalid attachment path", 400, "VALIDATION_ERROR");
-    }
-
-    if (!fs.existsSync(absoluteFilePath)) {
+    const exists = await storageService.fileExists(attachment.storageKey);
+    if (!exists) {
       throw new AppError(
         "Attachment file not found on server",
         404,
         "RESOURCE_NOT_FOUND"
       );
     }
+
+    const absoluteFilePath = storageService.getAbsoluteFilePath(
+      attachment.storageKey
+    );
 
     return {
       attachment: this.formatAttachmentResponse(attachment),
@@ -283,7 +270,7 @@ export class AttachmentService {
   }
 
   /**
-   * Deletes attachment metadata and unlinks physical file from local disk.
+   * Deletes attachment metadata and unlinks physical file via storage service.
    */
   public async deleteAttachment(
     organizationId: string,
@@ -317,11 +304,6 @@ export class AttachmentService {
       );
     }
 
-    const absoluteFilePath = path.resolve(
-      UPLOADS_ROOT_DIR,
-      attachment.storageKey
-    );
-
     // Run DB deletion transaction first
     await runInTransaction(async (session) => {
       const options = session ? { session } : {};
@@ -349,8 +331,8 @@ export class AttachmentService {
       return true;
     });
 
-    // Unlink physical file after DB succeeds. Handles ENOENT safely.
-    await fs.promises.unlink(absoluteFilePath).catch(() => {});
+    // Unlink physical file after DB succeeds via storage service
+    await storageService.deleteFile(attachment.storageKey);
 
     realtimeEventPublisher.publishAttachmentEvent(
       "attachment:deleted",

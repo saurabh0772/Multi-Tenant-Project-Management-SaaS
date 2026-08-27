@@ -41,8 +41,8 @@ export const healthController = {
     res.status(statusCode).json({
       status: isReady ? "ready" : "unavailable",
       checks: {
-        mongodb: mongoUp ? "up" : "down",
-        redis: redisUp ? "up" : "down",
+        mongodb: mongoUp ? "ok" : "down",
+        redis: redisUp ? "ok" : "down",
       },
     });
   },

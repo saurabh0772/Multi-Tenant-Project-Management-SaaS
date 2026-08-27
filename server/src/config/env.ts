@@ -33,6 +33,22 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   SLOW_REQUEST_THRESHOLD_MS: z.coerce.number().default(500),
+  TRUST_PROXY: z
+    .string()
+    .transform((val) => {
+      if (val === "true" || val === "1") return true;
+      if (val === "false" || val === "0") return false;
+      const num = Number(val);
+      return isNaN(num) ? val : num;
+    })
+    .default("false"),
+  STORAGE_DRIVER: z.enum(["local"]).default("local"),
+  METRICS_ENABLED: z
+    .string()
+    .transform((val) => val === "true" || val === "1")
+    .default("true"),
+  METRICS_USER: z.string().optional(),
+  METRICS_PASS: z.string().optional(),
 });
 
 const parseEnv = () => {

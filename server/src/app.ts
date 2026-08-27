@@ -6,7 +6,9 @@ import pinoHttp from "pino-http";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { requestIdMiddleware } from "./middlewares/request-id.middleware.js";
+import { metricsMiddleware } from "./middlewares/metrics.middleware.js";
 import healthRouter from "./routes/health.routes.js";
+import metricsRouter from "./routes/metrics.routes.js";
 import { healthController } from "./controllers/health.controller.js";
 import apiV1Router from "./routes/index.js";
 import { notFoundHandler } from "./middlewares/notFoundHandler.js";
@@ -15,11 +17,24 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 export const createApp = (): Express => {
   const app = express();
 
+  // Configure Trust Proxy dynamically based on environment setting
+  if (env.TRUST_PROXY !== false) {
+    app.set("trust proxy", env.TRUST_PROXY);
+  }
+
   // Attach Request ID & performance tracking early
   app.use(requestIdMiddleware);
 
+  // Attach Application Metrics collection middleware
+  app.use(metricsMiddleware);
+
   // Security headers
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+      hsts: env.NODE_ENV === "production",
+    })
+  );
 
   // CORS configuration
   app.use(
@@ -53,6 +68,9 @@ export const createApp = (): Express => {
 
   // Operational readiness check (unversioned)
   app.get("/ready", healthController.getReadiness);
+
+  // Application metrics endpoint (unversioned)
+  app.use("/metrics", metricsRouter);
 
   // Versioned API routes
   app.use("/api/v1", apiV1Router);

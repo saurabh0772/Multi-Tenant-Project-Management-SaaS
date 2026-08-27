@@ -3,7 +3,11 @@ import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
 import { initSocketServer, closeSocketServer } from "./realtime/socket.server.js";
+import { closeNotificationQueue } from "./queues/notification.queue.js";
+import { closeRedisConnection } from "./config/redis.js";
 import { logger } from "./utils/logger.js";
+
+let isShuttingDown = false;
 
 const startServer = async () => {
   try {
@@ -23,17 +27,24 @@ const startServer = async () => {
       logger.info(`Health check available at http://localhost:${env.PORT}/health`);
     });
 
-    // Graceful shutdown handling
+    // Idempotent graceful shutdown handler
     const gracefulShutdown = async (signal: string) => {
+      if (isShuttingDown) {
+        logger.warn({ signal }, "Shutdown already in progress. Ignoring duplicate signal.");
+        return;
+      }
+      isShuttingDown = true;
+
       logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
-      try {
-        await closeSocketServer();
-        logger.info("Socket.IO server closed successfully");
-      } catch (socketErr) {
-        logger.error({ err: socketErr }, "Error closing Socket.IO server");
-      }
+      // Set force exit timer (10s)
+      const forceExitTimer = setTimeout(() => {
+        logger.error("Forced shutdown due to 10s timeout.");
+        process.exit(1);
+      }, 10000);
+      forceExitTimer.unref();
 
+      // 1. Stop accepting new HTTP requests
       server.close(async (err) => {
         if (err) {
           logger.error({ err }, "Error closing HTTP server");
@@ -42,20 +53,30 @@ const startServer = async () => {
         }
 
         try {
+          // 2. Close Socket.IO gateway
+          await closeSocketServer();
+          logger.info("Socket.IO server closed");
+
+          // 3. Close BullMQ queue resources
+          await closeNotificationQueue();
+          logger.info("Notification queue closed");
+
+          // 4. Close Redis connection
+          await closeRedisConnection();
+          logger.info("Redis connection closed");
+
+          // 5. Disconnect MongoDB
           await disconnectDatabase();
-          logger.info("Graceful shutdown completed successfully.");
+          logger.info("Database disconnected. Shutdown complete.");
+
+          clearTimeout(forceExitTimer);
           process.exit(0);
-        } catch (dbErr) {
-          logger.error({ err: dbErr }, "Error disconnecting database during shutdown");
+        } catch (shutdownErr) {
+          logger.error({ err: shutdownErr }, "Error during graceful shutdown sequence");
+          clearTimeout(forceExitTimer);
           process.exit(1);
         }
       });
-
-      // Force shutdown after 10 seconds if shutdown hangs
-      setTimeout(() => {
-        logger.error("Forced shutdown due to timeout.");
-        process.exit(1);
-      }, 10000).unref();
     };
 
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
