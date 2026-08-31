@@ -8,6 +8,9 @@ import { organizationRepository } from "../repositories/organization.repository.
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
 import { CreateInvitationInput } from "../validators/invitation.schema.js";
+import { OrganizationRole } from "../constants/roles.js";
+import { authorizationService } from "./authorization.service.js";
+import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
 
 export class InvitationService {
   /**
@@ -17,8 +20,12 @@ export class InvitationService {
   public async sendInvitation(
     organizationId: string,
     input: CreateInvitationInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
+    if (actorRole) {
+      authorizationService.assertInvitationCreateAccess(actorRole, input.role);
+    }
     const email = input.email.toLowerCase().trim();
     const orgObjId = new Types.ObjectId(organizationId);
 
@@ -83,6 +90,21 @@ export class InvitationService {
       entityId: invitation._id,
       metadata: { email, role: input.role },
     });
+
+    realtimeEventPublisher.publishInvitationEvent(
+      "invitation:created",
+      organizationId,
+      {
+        invitation: {
+          id: invitation._id.toString(),
+          email: invitation.email,
+          role: invitation.role,
+          status: invitation.status,
+          expiresAt: invitation.expiresAt,
+        },
+        actorId: actorUserId,
+      }
+    );
 
     return {
       message: "Invitation created successfully",
@@ -163,8 +185,13 @@ export class InvitationService {
   public async revokeInvitation(
     organizationId: string,
     invitationId: string,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
+    if (actorRole) {
+      authorizationService.assertInvitationCreateAccess(actorRole, "MEMBER");
+    }
+
     const invitation = await invitationRepository.findOne({
       _id: invitationId,
       organizationId,
@@ -198,6 +225,15 @@ export class InvitationService {
       entityType: "Invitation",
       entityId: new Types.ObjectId(invitationId),
     });
+
+    realtimeEventPublisher.publishInvitationEvent(
+      "invitation:revoked",
+      organizationId,
+      {
+        invitationId,
+        actorId: actorUserId,
+      }
+    );
 
     return {
       message: "Invitation revoked successfully",
@@ -359,9 +395,33 @@ export class InvitationService {
         options
       );
 
+      const targetOrgIdStr = orgObjId.toString();
+
+      realtimeEventPublisher.publishInvitationEvent(
+        "invitation:accepted",
+        targetOrgIdStr,
+        {
+          organizationId: targetOrgIdStr,
+          userId: authenticatedUserId,
+          role: invitation.role,
+          email: user.email,
+        }
+      );
+
+      realtimeEventPublisher.publishMemberEvent(
+        "member:updated",
+        targetOrgIdStr,
+        authenticatedUserId,
+        {
+          userId: authenticatedUserId,
+          role: invitation.role,
+          status: "ACTIVE",
+        }
+      );
+
       return {
         message: "Invitation accepted successfully",
-        organizationId: orgObjId.toString(),
+        organizationId: targetOrgIdStr,
       };
     });
   }

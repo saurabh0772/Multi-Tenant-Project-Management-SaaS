@@ -88,7 +88,9 @@ export class TaskController {
       const result = await taskService.getTaskDetails(
         organizationId,
         taskId,
-        projectId
+        projectId,
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({
@@ -114,7 +116,8 @@ export class TaskController {
         organizationId,
         taskId,
         input,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({
@@ -140,7 +143,8 @@ export class TaskController {
         organizationId,
         taskId,
         input,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({
@@ -166,7 +170,8 @@ export class TaskController {
         organizationId,
         taskId,
         input.assignedTo,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({
@@ -190,7 +195,8 @@ export class TaskController {
       const result = await taskService.softDeleteTask(
         organizationId,
         taskId,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({
@@ -214,7 +220,8 @@ export class TaskController {
       const result = await taskService.restoreTask(
         organizationId,
         taskId,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({

@@ -15,7 +15,8 @@ export class InvitationController {
       const result = await invitationService.sendInvitation(
         organizationId,
         input,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(201).json({
@@ -67,7 +68,8 @@ export class InvitationController {
       const result = await invitationService.revokeInvitation(
         organizationId,
         invitationId,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({

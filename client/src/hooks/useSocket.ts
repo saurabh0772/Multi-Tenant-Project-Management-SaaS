@@ -51,11 +51,18 @@ export function useSocket() {
       queryClient.invalidateQueries({ queryKey: ["activities", activeOrgId] });
     };
 
-    // Member event handlers
+    // Member & Invitation event handlers
     const handleMemberEvent = () => {
-      queryClient.invalidateQueries({ queryKey: ["members", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["members"] });
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
       queryClient.invalidateQueries({ queryKey: ["search", activeOrgId] });
+    };
+
+    const handleInvitationEvent = () => {
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
     };
 
     // Notification event handlers
@@ -102,6 +109,10 @@ export function useSocket() {
     socket.on("member:removed", handleMemberEvent);
     socket.on("member:role-changed", handleMemberEvent);
 
+    socket.on("invitation:created", handleInvitationEvent);
+    socket.on("invitation:revoked", handleInvitationEvent);
+    socket.on("invitation:accepted", handleInvitationEvent);
+
     socket.on("notification:created", handleNotificationEvent);
     socket.on("notification:read", handleNotificationEvent);
     socket.on("notification:read-all", handleNotificationEvent);
@@ -135,6 +146,10 @@ export function useSocket() {
       socket.off("member:updated", handleMemberEvent);
       socket.off("member:removed", handleMemberEvent);
       socket.off("member:role-changed", handleMemberEvent);
+
+      socket.off("invitation:created", handleInvitationEvent);
+      socket.off("invitation:revoked", handleInvitationEvent);
+      socket.off("invitation:accepted", handleInvitationEvent);
 
       socket.off("notification:created", handleNotificationEvent);
       socket.off("notification:read", handleNotificationEvent);

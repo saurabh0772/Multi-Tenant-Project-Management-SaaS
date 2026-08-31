@@ -200,6 +200,35 @@ export class RealtimeEventPublisher {
       ...payload,
     });
   }
+
+  /**
+   * Publishes invitation events (created, revoked, accepted) to organization room and broadcast globally
+   */
+  public publishInvitationEvent(
+    eventName: string,
+    organizationId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    payload: Record<string, any>
+  ): void {
+    if (!this.io) return;
+
+    const orgRoom = getOrgRoomName(organizationId);
+
+    logger.debug(
+      { eventName, organizationId },
+      "Publishing invitation realtime event"
+    );
+
+    this.io.to(orgRoom).emit(eventName, {
+      organizationId,
+      ...payload,
+    });
+
+    this.io.emit(eventName, {
+      organizationId,
+      ...payload,
+    });
+  }
 }
 
 export const realtimeEventPublisher = new RealtimeEventPublisher();

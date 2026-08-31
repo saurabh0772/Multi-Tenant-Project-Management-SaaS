@@ -28,9 +28,12 @@ export const LoginPage: React.FC = () => {
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const apiErr = err as any;
+      const detailsMsg = apiErr.response?.data?.error?.details?.[0]?.message;
+      const mainMsg = apiErr.response?.data?.error?.message;
       setError(
-        apiErr.response?.data?.error?.message ||
-          "Failed to log in. Please check your credentials."
+        detailsMsg
+          ? `${mainMsg ? mainMsg + ": " : ""}${detailsMsg}`
+          : mainMsg || "Failed to log in. Please check your credentials."
       );
     } finally {
       setLoading(false);

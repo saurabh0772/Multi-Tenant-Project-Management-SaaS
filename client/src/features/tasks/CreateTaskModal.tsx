@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { taskApi } from "../../api/task.api.js";
 import { TaskStatus, TaskPriority, Membership } from "../../types/index.js";
 import { useQueryClient } from "@tanstack/react-query";
+import { useOrganization } from "../../hooks/useOrganization.js";
 import { X, Loader2, AlertCircle } from "lucide-react";
 
 interface CreateTaskModalProps {
@@ -20,6 +21,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   onClose,
 }) => {
   const queryClient = useQueryClient();
+  const { activeRole } = useOrganization();
+  const isMemberRole = activeRole === "MEMBER";
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -156,9 +159,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 Assignee
               </label>
               <select
-                value={assigneeId}
+                disabled={isMemberRole}
+                value={isMemberRole ? "" : assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">Unassigned</option>
                 {members.map((m) => {
@@ -172,9 +176,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     m._id ||
                     m.id ||
                     "";
-                  const name = userObj?.name || "";
+                  const name = userObj?.name || "Member";
                   const email = userObj?.email || "";
-                  const displayName = name ? (email ? `${name} (${email})` : name) : email || "Member";
+                  const role = m.role || mAny.role || "MEMBER";
+                  const displayName = `${name}${email ? ` (${email})` : ""} - ${role}`;
 
                   return (
                     <option key={targetUserId} value={targetUserId}>
@@ -183,6 +188,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   );
                 })}
               </select>
+              {isMemberRole && (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Task assignment is restricted to Owners, Admins, and Managers.
+                </p>
+              )}
             </div>
 
             <div>

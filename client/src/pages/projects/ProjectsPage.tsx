@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { useOrganization } from "../../hooks/useOrganization.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectApi } from "../../api/project.api.js";
-import { ProjectStatus } from "../../types/index.js";
+import { Project, ProjectStatus } from "../../types/index.js";
 import { Link } from "react-router-dom";
 import { CreateProjectModal } from "../../features/projects/CreateProjectModal.js";
+import { EditProjectModal } from "../../features/projects/EditProjectModal.js";
 import {
   FolderKanban,
   Plus,
@@ -14,16 +15,20 @@ import {
   RotateCcw,
   Trash2,
   Calendar,
+  Pencil,
 } from "lucide-react";
 import { formatDate } from "../../lib/utils.js";
 
 export const ProjectsPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const { activeOrg, hasPermission } = useOrganization();
+  const { activeOrg, activeRole, hasPermission } = useOrganization();
+  const canManageProjectLifecycle = activeRole === "OWNER" || activeRole === "ADMIN";
+  const canEditProject = activeRole === "OWNER" || activeRole === "ADMIN" || activeRole === "MANAGER";
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ["projects", activeOrg?._id, search, statusFilter],
@@ -171,7 +176,17 @@ export const ProjectsPage: React.FC = () => {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1">
-                      {hasPermission("PROJECT_UPDATE") && proj.status === "ACTIVE" && (
+                      {canEditProject && (
+                        <button
+                          onClick={() => setEditingProject(proj)}
+                          className="p-1 text-slate-500 hover:text-blue-400 rounded transition-all"
+                          title="Edit Project"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {canManageProjectLifecycle && proj.status === "ACTIVE" && (
                         <button
                           onClick={() => handleArchive(projId)}
                           className="p-1 text-slate-500 hover:text-amber-400 rounded transition-all"
@@ -181,7 +196,7 @@ export const ProjectsPage: React.FC = () => {
                         </button>
                       )}
 
-                      {hasPermission("PROJECT_UPDATE") && proj.status === "ARCHIVED" && (
+                      {canManageProjectLifecycle && proj.status === "ARCHIVED" && (
                         <button
                           onClick={() => handleRestore(projId)}
                           className="p-1 text-slate-500 hover:text-emerald-400 rounded transition-all"
@@ -191,7 +206,7 @@ export const ProjectsPage: React.FC = () => {
                         </button>
                       )}
 
-                      {hasPermission("PROJECT_DELETE") && (
+                      {canManageProjectLifecycle && (
                         <button
                           onClick={() => handleDelete(projId)}
                           className="p-1 text-slate-500 hover:text-rose-400 rounded transition-all"
@@ -239,6 +254,15 @@ export const ProjectsPage: React.FC = () => {
         <CreateProjectModal
           orgId={activeOrg._id || activeOrg.id || ""}
           onClose={() => setIsCreateModalOpen(false)}
+        />
+      )}
+
+      {/* Edit Project Modal */}
+      {editingProject && activeOrg && (
+        <EditProjectModal
+          orgId={activeOrg._id || activeOrg.id || ""}
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
         />
       )}
     </div>

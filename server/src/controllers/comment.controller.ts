@@ -21,7 +21,8 @@ export class CommentController {
         organizationId,
         taskId,
         input,
-        req.user!.id
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(201).json({
@@ -52,7 +53,9 @@ export class CommentController {
       const result = await commentService.listTaskComments(
         organizationId,
         taskId,
-        options
+        options,
+        req.user!.id,
+        req.organization!.role
       );
 
       res.status(200).json({

@@ -1,5 +1,4 @@
 import { Types } from "mongoose";
-import { projectService } from "./project.service.js";
 import { OrganizationRole } from "../constants/roles.js";
 import {
   taskRepository,
@@ -10,6 +9,7 @@ import { membershipRepository } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { notificationDispatcher } from "./notification-dispatcher.service.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { authorizationService } from "./authorization.service.js";
 import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
@@ -22,15 +22,33 @@ import { ITaskDocument } from "../models/task.model.js";
 
 export class TaskService {
   /**
-   * Format clean DTO response for task
+   * Format clean DTO response for task with member roles included
    */
-  private formatTaskResponse(task: ITaskDocument) {
+  private async formatTaskResponse(task: ITaskDocument) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const assignee = task.assignedTo as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const creator = task.createdBy as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const project = task.projectId as any;
+
+    const orgMemberships = await membershipRepository.findMany({
+      organizationId: task.organizationId,
+      status: { $ne: "REMOVED" },
+    });
+
+    const userRoleMap = new Map<string, string>();
+    orgMemberships.forEach((m) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mUser = m.userId as any;
+      const uIdStr = mUser?._id ? mUser._id.toString() : m.userId?.toString() || "";
+      if (uIdStr) {
+        userRoleMap.set(uIdStr, m.role);
+      }
+    });
+
+    const assigneeIdStr = assignee?._id ? assignee._id.toString() : task.assignedTo ? task.assignedTo.toString() : null;
+    const creatorIdStr = creator?._id ? creator._id.toString() : task.createdBy.toString();
 
     return {
       id: task._id.toString(),
@@ -50,18 +68,18 @@ export class TaskService {
             id: assignee._id.toString(),
             name: assignee.name,
             email: assignee.email,
+            role: userRoleMap.get(assignee._id.toString()) || "MEMBER",
             avatarUrl: assignee.avatarUrl || null,
           }
-        : task.assignedTo
-        ? task.assignedTo.toString()
-        : null,
+        : assigneeIdStr,
       createdBy: creator?._id
         ? {
             id: creator._id.toString(),
             name: creator.name,
             email: creator.email,
+            role: userRoleMap.get(creator._id.toString()) || "MEMBER",
           }
-        : task.createdBy.toString(),
+        : creatorIdStr,
       status: task.status,
       priority: task.priority,
       labels: task.labels || [],
@@ -75,7 +93,7 @@ export class TaskService {
   }
 
   /**
-   * Creates a new task in a project with tenant and assignee membership verification.
+   * Creates a new task in a project with tenant, project access, and assignee membership verification.
    */
   public async createTask(
     organizationId: string,
@@ -103,29 +121,16 @@ export class TaskService {
     }
 
     if (actorRole) {
-      const accessibleProjectIds = await projectService.getAccessibleProjectIds(
-        organizationId,
-        actorUserId,
-        actorRole
-      );
-
-      if (accessibleProjectIds !== null) {
-        const hasAccess = accessibleProjectIds.some(
-          (id) => id.toString() === project._id.toString()
-        );
-        if (!hasAccess) {
-          throw new AppError(
-            "You do not have permission to create tasks in this project",
-            403,
-            "FORBIDDEN"
-          );
-        }
-      }
+      authorizationService.assertProjectAccess(project, actorUserId, actorRole);
     }
 
     // 2. Verify assignee active membership if supplied
     let assigneeObjId: Types.ObjectId | null = null;
     if (input.assignedTo) {
+      if (actorRole === "MEMBER") {
+        authorizationService.assertTaskAssignAccess(actorRole);
+      }
+
       const activeAssignee = await membershipRepository.findActiveMembership(
         input.assignedTo,
         orgObjId
@@ -138,6 +143,15 @@ export class TaskService {
           "VALIDATION_ERROR"
         );
       }
+
+      if (!authorizationService.isProjectMember(project, input.assignedTo)) {
+        throw new AppError(
+          "Assignee must be an assigned member of this project",
+          400,
+          "VALIDATION_ERROR"
+        );
+      }
+
       assigneeObjId = new Types.ObjectId(input.assignedTo);
     }
 
@@ -199,9 +213,8 @@ export class TaskService {
         orgObjId
       );
 
-      const result = {
-        task: this.formatTaskResponse(populatedTask || createdTask),
-      };
+      const formatted = await this.formatTaskResponse(populatedTask || createdTask);
+      const result = { task: formatted };
 
       if (input.assignedTo) {
         await notificationDispatcher.dispatchTaskAssigned({
@@ -255,24 +268,7 @@ export class TaskService {
     }
 
     if (actorUserId && actorRole) {
-      const accessibleProjectIds = await projectService.getAccessibleProjectIds(
-        organizationId,
-        actorUserId,
-        actorRole
-      );
-
-      if (accessibleProjectIds !== null) {
-        const hasAccess = accessibleProjectIds.some(
-          (id) => id.toString() === project._id.toString()
-        );
-        if (!hasAccess) {
-          throw new AppError(
-            "You do not have permission to view tasks in this project",
-            403,
-            "FORBIDDEN"
-          );
-        }
-      }
+      authorizationService.assertProjectAccess(project, actorUserId, actorRole);
     }
 
     const { tasks, total, page, limit } =
@@ -282,8 +278,10 @@ export class TaskService {
         options
       );
 
+    const formattedTasks = await Promise.all(tasks.map((t) => this.formatTaskResponse(t)));
+
     return {
-      tasks: tasks.map((t) => this.formatTaskResponse(t)),
+      tasks: formattedTasks,
       pagination: {
         total,
         page,
@@ -299,7 +297,9 @@ export class TaskService {
   public async getTaskDetails(
     organizationId: string,
     taskId: string,
-    projectId?: string
+    projectId?: string,
+    actorUserId?: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
 
@@ -318,19 +318,32 @@ export class TaskService {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
     }
 
+    if (actorUserId && actorRole) {
+      const project = await projectRepository.getProjectById(
+        task.projectId,
+        orgObjId
+      );
+      if (project) {
+        authorizationService.assertProjectAccess(project, actorUserId, actorRole);
+      }
+    }
+
+    const formatted = await this.formatTaskResponse(task);
+
     return {
-      task: this.formatTaskResponse(task),
+      task: formatted,
     };
   }
 
   /**
-   * Updates task fields with tenant scoping and assignee validation.
+   * Updates task fields with tenant scoping, project authorization, and assignee validation.
    */
   public async updateTask(
     organizationId: string,
     taskId: string,
     input: UpdateTaskInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
@@ -338,6 +351,24 @@ export class TaskService {
     const task = await taskRepository.getTaskById(taskId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const project = await projectRepository.getProjectById(
+      task.projectId,
+      orgObjId
+    );
+    if (!project) {
+      throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    if (actorRole) {
+      authorizationService.assertProjectAccess(project, actorUserId, actorRole);
+      authorizationService.assertTaskUpdateAccess(
+        task,
+        actorUserId,
+        actorRole,
+        input.assignedTo
+      );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -375,6 +406,15 @@ export class TaskService {
               "VALIDATION_ERROR"
             );
           }
+
+          if (!authorizationService.isProjectMember(project, input.assignedTo)) {
+            throw new AppError(
+              "Assignee must be an assigned member of this project",
+              400,
+              "VALIDATION_ERROR"
+            );
+          }
+
           updatePayload.assignedTo = new Types.ObjectId(input.assignedTo);
         } else {
           updatePayload.assignedTo = null;
@@ -430,7 +470,7 @@ export class TaskService {
       metadata: activityMetadata,
     });
 
-    const formattedTask = this.formatTaskResponse(updatedTask);
+    const formattedTask = await this.formatTaskResponse(updatedTask);
 
     realtimeEventPublisher.publishTaskEvent(
       "task:updated",
@@ -454,7 +494,8 @@ export class TaskService {
     organizationId: string,
     taskId: string,
     input: MoveTaskInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
@@ -466,6 +507,19 @@ export class TaskService {
     const task = await taskRepository.getTaskById(taskId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const project = await projectRepository.getProjectById(
+      task.projectId,
+      orgObjId
+    );
+    if (!project) {
+      throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    if (actorRole) {
+      authorizationService.assertProjectAccess(project, actorUserId, actorRole);
+      authorizationService.assertTaskMoveAccess(task, actorUserId, actorRole);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -505,7 +559,7 @@ export class TaskService {
       },
     });
 
-    const formattedTask = this.formatTaskResponse(updatedTask);
+    const formattedTask = await this.formatTaskResponse(updatedTask);
 
     realtimeEventPublisher.publishTaskEvent(
       "task:moved",
@@ -529,20 +583,37 @@ export class TaskService {
   }
 
   /**
-   * Assign or reassign task assignee (TASK_ASSIGN permission)
+   * Assign or reassign task assignee (restricted to OWNER, ADMIN, MANAGER)
    */
   public async assignTask(
     organizationId: string,
     taskId: string,
     assignedTo: string | null,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
+    if (actorRole) {
+      authorizationService.assertTaskAssignAccess(actorRole);
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
     const task = await taskRepository.getTaskById(taskId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const project = await projectRepository.getProjectById(
+      task.projectId,
+      orgObjId
+    );
+    if (!project) {
+      throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    if (actorRole) {
+      authorizationService.assertProjectAccess(project, actorUserId, actorRole);
     }
 
     let assigneeObjId: Types.ObjectId | null = null;
@@ -559,6 +630,15 @@ export class TaskService {
           "VALIDATION_ERROR"
         );
       }
+
+      if (!authorizationService.isProjectMember(project, assignedTo)) {
+        throw new AppError(
+          "Assignee must be an assigned member of this project",
+          400,
+          "VALIDATION_ERROR"
+        );
+      }
+
       assigneeObjId = new Types.ObjectId(assignedTo);
     }
 
@@ -596,7 +676,7 @@ export class TaskService {
       });
     }
 
-    const formattedTask = this.formatTaskResponse(updatedTask);
+    const formattedTask = await this.formatTaskResponse(updatedTask);
 
     realtimeEventPublisher.publishTaskEvent(
       assignedTo ? "task:assigned" : "task:unassigned",
@@ -619,14 +699,27 @@ export class TaskService {
   public async softDeleteTask(
     organizationId: string,
     taskId: string,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
+    if (actorRole) {
+      authorizationService.assertTaskDeleteAccess(actorRole);
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
     const task = await taskRepository.getTaskById(taskId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    const project = await projectRepository.getProjectById(
+      task.projectId,
+      orgObjId
+    );
+    if (project && actorRole) {
+      authorizationService.assertProjectAccess(project, actorUserId, actorRole);
     }
 
     return await runInTransaction(async (session) => {
@@ -672,8 +765,13 @@ export class TaskService {
   public async restoreTask(
     organizationId: string,
     taskId: string,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
+    if (actorRole) {
+      authorizationService.assertTaskDeleteAccess(actorRole);
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
@@ -707,7 +805,7 @@ export class TaskService {
       return restored;
     });
 
-    const formattedTask = this.formatTaskResponse(restoredTask);
+    const formattedTask = await this.formatTaskResponse(restoredTask);
 
     realtimeEventPublisher.publishTaskEvent(
       "task:restored",
@@ -743,8 +841,10 @@ export class TaskService {
         options
       );
 
+    const formattedTasks = await Promise.all(tasks.map((t) => this.formatTaskResponse(t)));
+
     return {
-      tasks: tasks.map((t) => this.formatTaskResponse(t)),
+      tasks: formattedTasks,
       pagination: {
         total,
         page,

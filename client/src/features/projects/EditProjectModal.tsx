@@ -1,49 +1,57 @@
 import React, { useState } from "react";
 import { projectApi } from "../../api/project.api.js";
 import { orgApi } from "../../api/org.api.js";
-import { ProjectStatus } from "../../types/index.js";
+import { Project, ProjectStatus } from "../../types/index.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, AlertCircle, Users } from "lucide-react";
 
-interface CreateProjectModalProps {
+interface EditProjectModalProps {
   orgId: string;
+  project: Project;
   onClose: () => void;
 }
 
-export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
+export const EditProjectModal: React.FC<EditProjectModalProps> = ({
   orgId,
+  project,
   onClose,
 }) => {
   const queryClient = useQueryClient();
+  const projectId = project.id || project._id || "";
 
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<ProjectStatus>("ACTIVE");
-  const [startDate, setStartDate] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [name, setName] = useState(project.name || "");
+  const [slug, setSlug] = useState(project.slug || "");
+  const [description, setDescription] = useState(project.description || "");
+  const [status, setStatus] = useState<ProjectStatus>(project.status || "ACTIVE");
+  
+  const formatDateForInput = (d?: string | Date | null) => {
+    if (!d) return "";
+    const dateObj = new Date(d);
+    if (isNaN(dateObj.getTime())) return "";
+    return dateObj.toISOString().split("T")[0];
+  };
+
+  const [startDate, setStartDate] = useState(formatDateForInput(project.startDate));
+  const [dueDate, setDueDate] = useState(formatDateForInput(project.dueDate));
+
+  const getMemberUserId = (m: any): string => {
+    if (!m) return "";
+    if (typeof m === "string") return m;
+    return m.id || m._id || m.userId || "";
+  };
+
+  const initialMemberIds = (project.members || []).map(getMemberUserId).filter(Boolean);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(initialMemberIds);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Fetch organization members for member assignment
+  // Fetch organization members for selection
   const { data: members = [] } = useQuery({
     queryKey: ["members", orgId],
     queryFn: () => orgApi.listMembers(orgId),
     enabled: !!orgId,
   });
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setName(val);
-    setSlug(
-      val
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
-    );
-  };
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStartDate = e.target.value;
@@ -86,16 +94,17 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setLoading(true);
 
     try {
-      await projectApi.createProject(orgId, {
+      await projectApi.updateProject(orgId, projectId, {
         name,
         slug,
         description: description || undefined,
         status,
         startDate: startDate || undefined,
         dueDate: dueDate || undefined,
-        memberIds: selectedMemberIds.length > 0 ? selectedMemberIds : undefined,
+        memberIds: selectedMemberIds,
       });
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await queryClient.invalidateQueries({ queryKey: ["project", orgId, projectId] });
       onClose();
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,7 +113,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         apiErr.response?.data?.error?.message ||
           apiErr.response?.data?.message ||
           apiErr.message ||
-          "Failed to create project."
+          "Failed to update project."
       );
     } finally {
       setLoading(false);
@@ -115,7 +124,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm font-sans">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-          <h3 className="text-base font-bold text-white">Create New Project</h3>
+          <h3 className="text-base font-bold text-white">Edit Project</h3>
           <button
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-white rounded-lg"
@@ -140,8 +149,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               type="text"
               required
               value={name}
-              onChange={handleNameChange}
-              placeholder="Mobile App Design"
+              onChange={(e) => setName(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -155,7 +163,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               required
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              placeholder="mobile-app-design"
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -168,7 +175,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Project goals and overview..."
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -283,10 +289,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               {loading ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Creating...</span>
+                  <span>Saving...</span>
                 </>
               ) : (
-                <span>Create Project</span>
+                <span>Save Changes</span>
               )}
             </button>
           </div>

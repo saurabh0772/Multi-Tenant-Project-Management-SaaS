@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useOrganization } from "../../hooks/useOrganization.js";
+import { useAuthStore } from "../../store/authStore.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectApi } from "../../api/project.api.js";
 import { taskApi } from "../../api/task.api.js";
@@ -8,6 +9,7 @@ import { orgApi } from "../../api/org.api.js";
 import { Task, TaskStatus } from "../../types/index.js";
 import { socketClientManager } from "../../lib/socket-client.js";
 import { CreateTaskModal } from "../../features/tasks/CreateTaskModal.js";
+import { EditProjectModal } from "../../features/projects/EditProjectModal.js";
 import { TaskDetailsDrawer } from "../../features/tasks/TaskDetailsDrawer.js";
 import {
   Plus,
@@ -15,6 +17,7 @@ import {
   Calendar,
   GripVertical,
   Users,
+  Pencil,
 } from "lucide-react";
 import { formatDate } from "../../lib/utils.js";
 
@@ -29,10 +32,13 @@ export const ProjectDetailsPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { activeOrg, hasPermission } = useOrganization();
+  const { user } = useAuthStore();
+  const { activeOrg, activeRole, hasPermission } = useOrganization();
+  const canEditProject = activeRole === "OWNER" || activeRole === "ADMIN" || activeRole === "MANAGER";
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
   const [createTaskDefaultStatus, setCreateTaskDefaultStatus] = useState<TaskStatus>("TODO");
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
@@ -66,6 +72,27 @@ export const ProjectDetailsPage: React.FC = () => {
     queryFn: () => (activeOrg ? orgApi.listMembers(activeOrg._id) : []),
     enabled: !!activeOrg,
   });
+
+  const canMoveTask = (t: Task): boolean => {
+    if (activeRole === "OWNER" || activeRole === "ADMIN" || activeRole === "MANAGER") {
+      return true;
+    }
+    if (!user) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tAny = t as any;
+    const assigneeId =
+      tAny.assignedTo?.id ||
+      tAny.assignedTo?._id ||
+      (typeof tAny.assignedTo === "string" ? tAny.assignedTo : "") ||
+      "";
+    const creatorId =
+      tAny.createdBy?.id ||
+      tAny.createdBy?._id ||
+      (typeof tAny.createdBy === "string" ? tAny.createdBy : "") ||
+      "";
+    const userId = user.id || user._id || "";
+    return (assigneeId && assigneeId === userId) || (creatorId && creatorId === userId);
+  };
 
   if (!projectId || projectId === "undefined") {
     return (
@@ -114,7 +141,12 @@ export const ProjectDetailsPage: React.FC = () => {
   };
 
   // Drag Handlers
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+  const handleDragStart = (e: React.DragEvent, taskObj: Task) => {
+    if (!canMoveTask(taskObj)) {
+      e.preventDefault();
+      return;
+    }
+    const taskId = taskObj.id || taskObj._id || "";
     setDraggedTaskId(taskId);
     e.dataTransfer.setData("text/plain", taskId);
   };
@@ -127,6 +159,13 @@ export const ProjectDetailsPage: React.FC = () => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
     if (!taskId) return;
+
+    const taskObj = tasks.find((t) => (t.id || t._id) === taskId);
+    if (taskObj && !canMoveTask(taskObj)) {
+      alert("Members can only move tasks assigned to them or created by them.");
+      setDraggedTaskId(null);
+      return;
+    }
 
     const columnTasks = tasks.filter((t) => t.status === targetStatus);
     const targetPosition = columnTasks.length + 1;
@@ -182,31 +221,48 @@ export const ProjectDetailsPage: React.FC = () => {
                   <Users className="w-3.5 h-3.5 text-blue-400" />
                   <span>Members:</span>
                 </span>
-                {project.members.map((m) => (
-                  <span
-                    key={m.id}
-                    className="px-2.5 py-0.5 bg-slate-900 border border-slate-800 rounded-lg text-[10px] text-slate-200 font-medium"
-                    title={m.email}
-                  >
-                    {m.name || m.email || "Member"}
-                  </span>
-                ))}
+                {project.members.map((m: any) => {
+                  const name = m.name || "Member";
+                  const email = m.email || "";
+                  const role = m.role || "MEMBER";
+                  return (
+                    <span
+                      key={m.id || m._id}
+                      className="px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-slate-200 font-medium"
+                      title={email}
+                    >
+                      {name}{email ? ` (${email})` : ""} - <span className="text-slate-400 font-mono text-[10px] uppercase font-bold">{role}</span>
+                    </span>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {hasPermission("TASK_CREATE") && (
-            <button
-              onClick={() => {
-                setCreateTaskDefaultStatus("TODO");
-                setIsCreateTaskOpen(true);
-              }}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs transition-all flex items-center gap-2 self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Task</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {canEditProject && (
+              <button
+                onClick={() => setIsEditProjectOpen(true)}
+                className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-medium rounded-xl text-xs transition-all flex items-center gap-2"
+              >
+                <Pencil className="w-4 h-4 text-blue-400" />
+                <span>Edit Project</span>
+              </button>
+            )}
+
+            {hasPermission("TASK_CREATE") && (
+              <button
+                onClick={() => {
+                  setCreateTaskDefaultStatus("TODO");
+                  setIsCreateTaskOpen(true);
+                }}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Task</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -252,19 +308,24 @@ export const ProjectDetailsPage: React.FC = () => {
               <div className="space-y-3 flex-1">
                 {colTasks.map((t) => {
                   const taskId = t.id || t._id || "";
+                  const movable = canMoveTask(t);
                   return (
                     <div
                       key={taskId}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, taskId)}
+                      draggable={movable}
+                      onDragStart={(e) => handleDragStart(e, t)}
                       onClick={() => setSelectedTask(t)}
-                      className="p-4 bg-slate-900 border border-slate-800/80 hover:border-blue-500/50 rounded-2xl cursor-pointer transition-all shadow-md group relative"
+                      className={`p-4 bg-slate-900 border border-slate-800/80 hover:border-blue-500/50 rounded-2xl cursor-pointer transition-all shadow-md group relative ${
+                        !movable ? "opacity-90" : ""
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h4 className="text-xs font-bold text-white group-hover:text-blue-400 transition-all line-clamp-2">
                           {t.title}
                         </h4>
-                        <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 shrink-0 mt-0.5" />
+                        {movable && (
+                          <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 shrink-0 mt-0.5" />
+                        )}
                       </div>
 
                       {t.description && (
@@ -308,6 +369,15 @@ export const ProjectDetailsPage: React.FC = () => {
           members={members}
           defaultStatus={createTaskDefaultStatus}
           onClose={() => setIsCreateTaskOpen(false)}
+        />
+      )}
+
+      {/* Edit Project Modal */}
+      {isEditProjectOpen && activeOrg && project && (
+        <EditProjectModal
+          orgId={activeOrg._id || activeOrg.id || ""}
+          project={project}
+          onClose={() => setIsEditProjectOpen(false)}
         />
       )}
 

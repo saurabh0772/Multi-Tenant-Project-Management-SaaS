@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { orgApi } from "../../api/org.api.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { AuthLayout } from "../../components/layout/AuthLayout.js";
@@ -10,6 +10,7 @@ export const AcceptInvitationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, checkAuth } = useAuth();
 
   const [accepting, setAccepting] = useState(false);
@@ -36,11 +37,14 @@ export const AcceptInvitationPage: React.FC = () => {
       const res = await orgApi.acceptInvitation(token);
       setSuccessMsg(res.message || "Invitation accepted successfully!");
       
-      // Update global auth state & set active org immediately
-      await checkAuth();
       if (res.organizationId) {
         localStorage.setItem("saas_active_org_id", res.organizationId);
       }
+
+      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      await queryClient.invalidateQueries({ queryKey: ["members"] });
+      await queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      await checkAuth();
 
       setTimeout(() => {
         navigate("/dashboard");

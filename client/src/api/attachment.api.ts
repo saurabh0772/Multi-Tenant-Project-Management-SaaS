@@ -29,6 +29,17 @@ export const attachmentApi = {
     return `${baseURL}/organizations/${orgId}/attachments/${attachmentId}/download`;
   },
 
+  getTaskAttachments: async (
+    orgId: string,
+    taskId: string
+  ): Promise<Attachment[]> => {
+    const res = await apiClient.get<ApiResponse<Attachment[]>>(
+      `/organizations/${orgId}/attachments`,
+      { params: { taskId } }
+    );
+    return res.data.data;
+  },
+
   deleteAttachment: async (
     orgId: string,
     attachmentId: string

@@ -7,6 +7,7 @@ import { taskRepository } from "../repositories/task.repository.js";
 import { membershipRepository } from "../repositories/membership.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { authorizationService } from "./authorization.service.js";
 import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
@@ -19,25 +20,54 @@ import { OrganizationRole } from "../constants/roles.js";
 
 export class ProjectService {
   /**
-   * Helper to format safe project response DTO
+   * Helper to format safe project response DTO with user roles included
    */
-  private formatProjectResponse(project: IProjectDocument) {
+  private async formatProjectResponse(project: IProjectDocument) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const owner = project.ownerId as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const creator = project.createdBy as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const membersArr = Array.isArray(project.members) ? (project.members as any[]) : [];
-    const formattedMembers = membersArr.map((m) =>
-      typeof m === "object" && m !== null
-        ? {
-            id: m._id ? m._id.toString() : m.id,
-            name: m.name || "",
-            email: m.email || "",
-            avatarUrl: m.avatarUrl || null,
-          }
-        : { id: m.toString(), name: "Member", email: "" }
-    );
+
+    const orgMemberships = await membershipRepository.findMany({
+      organizationId: project.organizationId,
+      status: { $ne: "REMOVED" },
+    });
+
+    const userRoleMap = new Map<string, string>();
+    orgMemberships.forEach((m) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mUser = m.userId as any;
+      const uIdStr = mUser?._id ? mUser._id.toString() : m.userId?.toString() || "";
+      if (uIdStr) {
+        userRoleMap.set(uIdStr, m.role);
+      }
+    });
+
+    const formattedMembers = membersArr.map((m) => {
+      if (typeof m === "object" && m !== null) {
+        const idStr = m._id ? m._id.toString() : m.id?.toString() || "";
+        return {
+          id: idStr,
+          name: m.name || "",
+          email: m.email || "",
+          role: userRoleMap.get(idStr) || "MEMBER",
+          avatarUrl: m.avatarUrl || null,
+        };
+      }
+      const idStr = m.toString();
+      return {
+        id: idStr,
+        name: "Member",
+        email: "",
+        role: userRoleMap.get(idStr) || "MEMBER",
+        avatarUrl: null,
+      };
+    });
+
+    const ownerIdStr = owner?._id ? owner._id.toString() : project.ownerId.toString();
+    const creatorIdStr = creator?._id ? creator._id.toString() : project.createdBy.toString();
 
     return {
       id: project._id.toString(),
@@ -45,20 +75,22 @@ export class ProjectService {
       name: project.name,
       slug: project.slug,
       description: project.description || "",
-      ownerId: owner?._id ? owner._id.toString() : project.ownerId.toString(),
+      ownerId: ownerIdStr,
       owner: owner?._id
         ? {
-            id: owner._id.toString(),
+            id: ownerIdStr,
             name: owner.name,
             email: owner.email,
+            role: userRoleMap.get(ownerIdStr) || "OWNER",
             avatarUrl: owner.avatarUrl || null,
           }
         : null,
       createdBy: creator?._id
         ? {
-            id: creator._id.toString(),
+            id: creatorIdStr,
             name: creator.name,
             email: creator.email,
+            role: userRoleMap.get(creatorIdStr) || "MEMBER",
           }
         : project.createdBy.toString(),
       members: formattedMembers,
@@ -116,6 +148,14 @@ export class ProjectService {
       );
     }
 
+    if (input.startDate && input.dueDate && new Date(input.dueDate) < new Date(input.startDate)) {
+      throw new AppError(
+        "Due date must be on or after start date",
+        400,
+        "VALIDATION_ERROR"
+      );
+    }
+
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
     const targetOwnerId = input.ownerId || actorUserId;
@@ -149,7 +189,7 @@ export class ProjectService {
             orgObjId
           );
           if (activeMem) {
-            membersSet.add(mId);
+            membersSet.add(mId.toString());
           }
         }
       }
@@ -231,9 +271,8 @@ export class ProjectService {
         orgObjId
       );
 
-      const result = {
-        project: this.formatProjectResponse(populatedProject || createdProject),
-      };
+      const formatted = await this.formatProjectResponse(populatedProject || createdProject);
+      const result = { project: formatted };
 
       realtimeEventPublisher.publishProjectEvent(
         "project:created",
@@ -270,7 +309,7 @@ export class ProjectService {
         accessibleProjectIds
       );
 
-    const formattedProjects = projects.map((p) => this.formatProjectResponse(p));
+    const formattedProjects = await Promise.all(projects.map((p) => this.formatProjectResponse(p)));
 
     return {
       projects: formattedProjects,
@@ -301,27 +340,12 @@ export class ProjectService {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
     }
 
-    const accessibleProjectIds = await this.getAccessibleProjectIds(
-      organizationId,
-      actorUserId,
-      actorRole
-    );
+    authorizationService.assertProjectAccess(project, actorUserId, actorRole);
 
-    if (accessibleProjectIds !== null) {
-      const hasAccess = accessibleProjectIds.some(
-        (id) => id.toString() === project._id.toString()
-      );
-      if (!hasAccess) {
-        throw new AppError(
-          "You do not have permission to view this project",
-          403,
-          "FORBIDDEN"
-        );
-      }
-    }
+    const formatted = await this.formatProjectResponse(project);
 
     return {
-      project: this.formatProjectResponse(project),
+      project: formatted,
     };
   }
 
@@ -335,14 +359,6 @@ export class ProjectService {
     actorUserId: string,
     actorRole: OrganizationRole
   ) {
-    if (actorRole === "MEMBER") {
-      throw new AppError(
-        "Members are not permitted to update projects",
-        403,
-        "FORBIDDEN"
-      );
-    }
-
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
 
@@ -355,23 +371,17 @@ export class ProjectService {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
     }
 
-    const accessibleProjectIds = await this.getAccessibleProjectIds(
-      organizationId,
-      actorUserId,
-      actorRole
-    );
+    authorizationService.assertProjectUpdateAccess(project, actorUserId, actorRole);
 
-    if (accessibleProjectIds !== null) {
-      const hasAccess = accessibleProjectIds.some(
-        (id) => id.toString() === project._id.toString()
+    const newStartDate = input.startDate !== undefined ? (input.startDate ? new Date(input.startDate) : null) : project.startDate;
+    const newDueDate = input.dueDate !== undefined ? (input.dueDate ? new Date(input.dueDate) : null) : project.dueDate;
+
+    if (newStartDate && newDueDate && new Date(newDueDate) < new Date(newStartDate)) {
+      throw new AppError(
+        "Due date must be on or after start date",
+        400,
+        "VALIDATION_ERROR"
       );
-      if (!hasAccess) {
-        throw new AppError(
-          "You do not have permission to update this project",
-          403,
-          "FORBIDDEN"
-        );
-      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -418,7 +428,7 @@ export class ProjectService {
             orgObjId
           );
           if (activeMem) {
-            membersSet.add(mId);
+            membersSet.add(mId.toString());
           }
         }
       }
@@ -483,7 +493,7 @@ export class ProjectService {
       metadata: activityMetadata,
     });
 
-    const formattedProject = this.formatProjectResponse(updatedProject);
+    const formattedProject = await this.formatProjectResponse(updatedProject);
 
     realtimeEventPublisher.publishProjectEvent(
       "project:updated",
@@ -500,7 +510,7 @@ export class ProjectService {
   }
 
   /**
-   * Archives a project (MANAGER, ADMIN, OWNER).
+   * Archives a project (OWNER and ADMIN only).
    */
   public async archiveProject(
     organizationId: string,
@@ -508,13 +518,7 @@ export class ProjectService {
     actorUserId: string,
     actorRole: OrganizationRole
   ) {
-    if (actorRole === "MEMBER") {
-      throw new AppError(
-        "Members are not permitted to archive projects",
-        403,
-        "FORBIDDEN"
-      );
-    }
+    authorizationService.assertProjectArchiveAccess(actorRole);
 
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
@@ -524,29 +528,13 @@ export class ProjectService {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
     }
 
-    const accessibleProjectIds = await this.getAccessibleProjectIds(
-      organizationId,
-      actorUserId,
-      actorRole
-    );
-
-    if (accessibleProjectIds !== null) {
-      const hasAccess = accessibleProjectIds.some(
-        (id) => id.toString() === project._id.toString()
-      );
-      if (!hasAccess) {
-        throw new AppError(
-          "You do not have permission to archive this project",
-          403,
-          "FORBIDDEN"
-        );
-      }
-    }
+    authorizationService.assertProjectAccess(project, actorUserId, actorRole);
 
     if (project.status === "ARCHIVED") {
+      const formatted = await this.formatProjectResponse(project);
       return {
         message: "Project is already archived",
-        project: this.formatProjectResponse(project),
+        project: formatted,
       };
     }
 
@@ -568,7 +556,7 @@ export class ProjectService {
       entityId: updated._id,
     });
 
-    const formattedProject = this.formatProjectResponse(updated);
+    const formattedProject = await this.formatProjectResponse(updated);
 
     realtimeEventPublisher.publishProjectEvent(
       "project:archived",
@@ -594,13 +582,7 @@ export class ProjectService {
     actorUserId: string,
     actorRole: OrganizationRole
   ) {
-    if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
-      throw new AppError(
-        "Only organization owners and administrators can restore archived projects",
-        403,
-        "FORBIDDEN"
-      );
-    }
+    authorizationService.assertProjectArchiveAccess(actorRole);
 
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
@@ -610,10 +592,13 @@ export class ProjectService {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
     }
 
+    authorizationService.assertProjectAccess(project, actorUserId, actorRole);
+
     if (project.status !== "ARCHIVED") {
+      const formatted = await this.formatProjectResponse(project);
       return {
         message: "Project is not archived",
-        project: this.formatProjectResponse(project),
+        project: formatted,
       };
     }
 
@@ -635,7 +620,7 @@ export class ProjectService {
       entityId: updated._id,
     });
 
-    const formattedProject = this.formatProjectResponse(updated);
+    const formattedProject = await this.formatProjectResponse(updated);
 
     realtimeEventPublisher.publishProjectEvent(
       "project:restored",
@@ -661,13 +646,7 @@ export class ProjectService {
     actorUserId: string,
     actorRole: OrganizationRole
   ) {
-    if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
-      throw new AppError(
-        "Only organization owners and administrators can delete projects",
-        403,
-        "FORBIDDEN"
-      );
-    }
+    authorizationService.assertProjectDeleteAccess(actorRole);
 
     const orgObjId = new Types.ObjectId(organizationId);
     const actorObjId = new Types.ObjectId(actorUserId);
@@ -677,6 +656,8 @@ export class ProjectService {
     if (!project) {
       throw new AppError("Project not found", 404, "RESOURCE_NOT_FOUND");
     }
+
+    authorizationService.assertProjectAccess(project, actorUserId, actorRole);
 
     return await runInTransaction(async (session) => {
       const options = session ? { session } : {};

@@ -4,9 +4,11 @@ import {
   FindCommentsOptions,
 } from "../repositories/comment.repository.js";
 import { taskRepository } from "../repositories/task.repository.js";
+import { projectRepository } from "../repositories/project.repository.js";
 import { activityLogRepository } from "../repositories/activity.repository.js";
 import { notificationDispatcher } from "./notification-dispatcher.service.js";
 import { realtimeEventPublisher } from "../realtime/socket.publisher.js";
+import { authorizationService } from "./authorization.service.js";
 import { searchService } from "./search.service.js";
 import { AppError } from "../utils/AppError.js";
 import { runInTransaction } from "../utils/transaction.js";
@@ -15,6 +17,7 @@ import {
   UpdateCommentInput,
 } from "../validators/comment.schema.js";
 import { ICommentDocument } from "../models/comment.model.js";
+import { OrganizationRole } from "../constants/roles.js";
 
 export class CommentService {
   /**
@@ -62,7 +65,8 @@ export class CommentService {
     organizationId: string,
     taskId: string,
     input: CreateCommentInput,
-    actorUserId: string
+    actorUserId: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const taskObjId = new Types.ObjectId(taskId);
@@ -72,6 +76,13 @@ export class CommentService {
     const task = await taskRepository.getTaskById(taskObjId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    if (actorRole && task.projectId) {
+      const project = await projectRepository.getProjectById(task.projectId, orgObjId);
+      if (project) {
+        authorizationService.assertProjectAccess(project, actorUserId, actorRole);
+      }
     }
 
     return await runInTransaction(async (session) => {
@@ -152,7 +163,9 @@ export class CommentService {
   public async listTaskComments(
     organizationId: string,
     taskId: string,
-    options: FindCommentsOptions
+    options: FindCommentsOptions,
+    actorUserId?: string,
+    actorRole?: OrganizationRole
   ) {
     const orgObjId = new Types.ObjectId(organizationId);
     const taskObjId = new Types.ObjectId(taskId);
@@ -160,6 +173,13 @@ export class CommentService {
     const task = await taskRepository.getTaskById(taskObjId, orgObjId);
     if (!task) {
       throw new AppError("Task not found", 404, "RESOURCE_NOT_FOUND");
+    }
+
+    if (actorUserId && actorRole && task.projectId) {
+      const project = await projectRepository.getProjectById(task.projectId, orgObjId);
+      if (project) {
+        authorizationService.assertProjectAccess(project, actorUserId, actorRole);
+      }
     }
 
     const { comments, total, page, limit } =

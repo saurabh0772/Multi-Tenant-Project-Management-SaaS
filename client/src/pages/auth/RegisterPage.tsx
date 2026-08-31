@@ -36,9 +36,12 @@ export const RegisterPage: React.FC = () => {
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const apiErr = err as any;
+      const detailsMsg = apiErr.response?.data?.error?.details?.[0]?.message;
+      const mainMsg = apiErr.response?.data?.error?.message;
       setError(
-        apiErr.response?.data?.error?.message ||
-          "Registration failed. Please check your details."
+        detailsMsg
+          ? `${mainMsg ? mainMsg + ": " : ""}${detailsMsg}`
+          : mainMsg || "Registration failed. Please check your details."
       );
     } finally {
       setLoading(false);
@@ -98,6 +101,9 @@ export const RegisterPage: React.FC = () => {
             placeholder="••••••••"
             className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           />
+          <p className="mt-1 text-[11px] text-slate-400">
+            Min 8 chars, including uppercase, lowercase, number, and special character.
+          </p>
         </div>
 
         <div>
